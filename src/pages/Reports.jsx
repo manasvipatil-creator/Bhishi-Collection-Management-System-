@@ -1,0 +1,590 @@
+import React, { useState, useEffect } from "react";
+import { getAllAgents, getAllTransactions, getAgentCustomers } from "../utils/databaseHelpers";
+import { exportToExcelWithFormat } from "../utils/excelExport";
+
+export default function Reports() {
+  const [selectedReport, setSelectedReport] = useState("");
+  const [agents, setAgents] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [reportData, setReportData] = useState(null);
+  
+  // Filter states
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [selectedAgent, setSelectedAgent] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState("");
+  const [weekNumber, setWeekNumber] = useState("");
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [agentsData, transactionsData] = await Promise.all([
+        getAllAgents(),
+        getAllTransactions()
+      ]);
+      
+      setAgents(agentsData);
+      setTransactions(transactionsData);
+      
+      // Get all customers
+      const allCustomers = [];
+      for (const agent of agentsData) {
+        const agentCustomers = await getAgentCustomers(agent.phone);
+        allCustomers.push(...agentCustomers.map(c => ({ ...c, agentPhone: agent.phone, agentName: agent.name })));
+      }
+      setCustomers(allCustomers);
+    } catch (error) {
+      console.error("Error loading report data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateReport = () => {
+    switch (selectedReport) {
+      case "agentwise":
+        return generateAgentWiseReport();
+      case "customerwise":
+        return generateCustomerWiseReport();
+      case "transactions":
+        return generateTransactionReport();
+      case "summary":
+        return generateSummaryReport();
+      default:
+        return null;
+    }
+  };
+
+  const generateAgentWiseReport = () => {
+    let filteredAgents = agents;
+    if (selectedAgent) {
+      filteredAgents = agents.filter(a => a.phone === selectedAgent);
+    }
+    
+    return filteredAgents.map(agent => {
+      let agentTransactions = transactions.filter(t => t.agentPhone === agent.phone);
+      
+      // Apply date filter
+      if (fromDate) {
+        agentTransactions = agentTransactions.filter(t => new Date(t.date) >= new Date(fromDate));
+      }
+      if (toDate) {
+        agentTransactions = agentTransactions.filter(t => new Date(t.date) <= new Date(toDate));
+      }
+      
+      const agentCustomers = customers.filter(c => c.agentPhone === agent.phone);
+      
+      return {
+        agentName: agent.name || 'N/A',
+        agentPhone: agent.phone || 'N/A',
+        totalCustomers: agentCustomers.length || 0,
+        totalTransactions: agentTransactions.length || 0,
+        totalDeposits: agentTransactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + (t.amount || 0), 0),
+        totalWithdrawals: agentTransactions.filter(t => t.type === 'withdrawal').reduce((sum, t) => sum + (t.amount || 0), 0)
+      };
+    });
+  };
+
+  const generateCustomerWiseReport = () => {
+    let filteredCustomers = customers;
+    
+    if (selectedAgent) {
+      filteredCustomers = filteredCustomers.filter(c => c.agentPhone === selectedAgent);
+    }
+    if (selectedCustomer) {
+      filteredCustomers = filteredCustomers.filter(c => c.phone === selectedCustomer);
+    }
+    
+    return filteredCustomers.map(customer => {
+      const customerTransactions = transactions.filter(t => t.customerPhone === customer.phone);
+      const totalDeposits = customerTransactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + (t.amount || 0), 0);
+      const totalWithdrawals = customerTransactions.filter(t => t.type === 'withdrawal').reduce((sum, t) => sum + (t.amount || 0), 0);
+      
+      return {
+        customerName: customer.name,
+        customerPhone: customer.phone,
+        agentName: customer.agentName,
+        totalDeposits,
+        totalWithdrawals,
+        balance: customer.balance || 0,
+        status: customer.status,
+        joinDate: customer.joinDate
+      };
+    });
+  };
+
+  const generateTransactionReport = () => {
+    let filteredTransactions = transactions;
+    
+    // Apply filters
+    if (fromDate) {
+      filteredTransactions = filteredTransactions.filter(t => new Date(t.date) >= new Date(fromDate));
+    }
+    if (toDate) {
+      filteredTransactions = filteredTransactions.filter(t => new Date(t.date) <= new Date(toDate));
+    }
+    if (selectedAgent) {
+      filteredTransactions = filteredTransactions.filter(t => t.agentPhone === selectedAgent);
+    }
+    if (selectedCustomer) {
+      filteredTransactions = filteredTransactions.filter(t => t.customerPhone === selectedCustomer);
+    }
+    
+    return filteredTransactions.map(t => ({
+      date: t.date || 'N/A',
+      customerName: t.customerName || 'N/A',
+      agentName: t.agentName || 'N/A',
+      type: t.type || 'N/A',
+      amount: t.amount || 0,
+      mode: t.mode || 'N/A',
+      remarks: t.remarks || ''
+    }));
+  };
+
+  const generateSummaryReport = () => {
+    let filteredTransactions = transactions;
+    
+    // Apply date filter
+    if (fromDate) {
+      filteredTransactions = filteredTransactions.filter(t => new Date(t.date) >= new Date(fromDate));
+    }
+    if (toDate) {
+      filteredTransactions = filteredTransactions.filter(t => new Date(t.date) <= new Date(toDate));
+    }
+    
+    const totalDeposits = filteredTransactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalWithdrawals = filteredTransactions.filter(t => t.type === 'withdrawal').reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalPenalties = filteredTransactions.filter(t => t.type === 'penalty').reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalBonuses = filteredTransactions.filter(t => t.type === 'bonus').reduce((sum, t) => sum + (t.amount || 0), 0);
+    
+    return {
+      totalAgents: agents.length,
+      totalCustomers: customers.length,
+      totalTransactions: filteredTransactions.length,
+      totalDeposits,
+      totalWithdrawals,
+      totalPenalties,
+      totalBonuses,
+      netBalance: totalDeposits - totalWithdrawals + totalBonuses - totalPenalties
+    };
+  };
+
+  useEffect(() => {
+    if (selectedReport) {
+      const data = generateReport();
+      setReportData(data);
+    }
+  }, [selectedReport, agents, transactions, customers, fromDate, toDate, selectedAgent, selectedCustomer, weekNumber]);
+  
+  const handleResetFilters = () => {
+    setFromDate("");
+    setToDate("");
+    setSelectedAgent("");
+    setSelectedCustomer("");
+    setWeekNumber("");
+  };
+  
+  const handleGenerateReport = (e) => {
+    e.preventDefault();
+    const data = generateReport();
+    setReportData(data);
+  };
+  
+  // Calculate real-time statistics
+  const getQuickStats = () => {
+    const activeAgents = agents.filter(a => a.status === 'active').length;
+    const totalCollections = transactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalPenalties = transactions.filter(t => t.type === 'penalty').reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalBonuses = transactions.filter(t => t.type === 'bonus').reduce((sum, t) => sum + (t.amount || 0), 0);
+    
+    return {
+      activeAgents: activeAgents || agents.length,
+      totalCollections,
+      totalPenalties,
+      totalBonuses
+    };
+  };
+  
+  const quickStats = getQuickStats();
+
+  const reportTypes = [
+    {
+      id: "agentwise",
+      title: "Agent-wise Report",
+      description: "Generate reports for individual agents and their performance",
+      icon: "👨‍💼",
+      color: "var(--primary-gradient)"
+    },
+    {
+      id: "customerwise",
+      title: "Customer-wise Report", 
+      description: "Generate detailed customer reports with balances and transactions",
+      icon: "👥",
+      color: "var(--success-gradient)"
+    },
+    {
+      id: "weekly",
+      title: "Weekly Collections Report",
+      description: "Track weekly collection performance and missed payments",
+      icon: "📅",
+      color: "var(--warning-gradient)"
+    },
+    {
+      id: "penalties",
+      title: "Penalties & Bonuses Report",
+      description: "View all penalties applied and year-end bonuses calculated",
+      icon: "⚖️",
+      color: "var(--secondary-gradient)"
+    },
+    {
+      id: "transactions",
+      title: "Transaction Report",
+      description: "Comprehensive transaction history with deposits and withdrawals",
+      icon: "💳",
+      color: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+    },
+    {
+      id: "summary",
+      title: "Business Summary",
+      description: "Overall business performance and financial summary",
+      icon: "📊",
+      color: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
+    }
+  ];
+
+  return (
+    <div className="container-fluid fade-in-up">
+      {/* Header */}
+      <div className="card border-0 mb-4" style={{ background: 'var(--warning-gradient)', color: 'white' }}>
+        <div className="card-body p-4">
+          <div className="d-flex align-items-center">
+            <div className="me-3">
+              <div className="rounded-circle d-flex align-items-center justify-content-center"
+                   style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.2)' }}>
+                <span style={{ fontSize: '1.5rem' }}>📊</span>
+              </div>
+            </div>
+            <div>
+              <h4 className="mb-1 fw-bold">Reports & Analytics</h4>
+              <p className="mb-0 opacity-75">Generate comprehensive reports for your collection business</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Report Types */}
+      <div className="row mb-4">
+        {reportTypes.map((report) => (
+          <div key={report.id} className="col-lg-4 col-md-6 mb-3">
+            <div 
+              className={`card border-0 h-100 ${selectedReport === report.id ? 'shadow-lg' : ''}`}
+              style={{ cursor: 'pointer', transform: selectedReport === report.id ? 'scale(1.02)' : 'scale(1)' }}
+              onClick={() => setSelectedReport(report.id)}
+            >
+              <div className="card-body text-center p-4">
+                <div className="mb-3">
+                  <div className="rounded-circle mx-auto d-flex align-items-center justify-content-center"
+                       style={{ 
+                         width: '70px', 
+                         height: '70px', 
+                         background: report.color,
+                         fontSize: '2rem'
+                       }}>
+                    {report.icon}
+                  </div>
+                </div>
+                <h6 className="fw-bold mb-2">{report.title}</h6>
+                <p className="text-muted small mb-0">{report.description}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Report Display */}
+      {selectedReport && reportData && (
+        <div className="card">
+          <div className="card-header">
+            <h5 className="mb-0">{reportTypes.find(r => r.id === selectedReport)?.title}</h5>
+          </div>
+          <div className="card-body">
+            {selectedReport === 'summary' ? (
+              <div className="row">
+                <div className="col-md-3 mb-3">
+                  <div className="stats-card">
+                    <h3 className="stats-number">{reportData.totalAgents}</h3>
+                    <p className="stats-label">Total Agents</p>
+                  </div>
+                </div>
+                <div className="col-md-3 mb-3">
+                  <div className="stats-card">
+                    <h3 className="stats-number">{reportData.totalCustomers}</h3>
+                    <p className="stats-label">Total Customers</p>
+                  </div>
+                </div>
+                <div className="col-md-3 mb-3">
+                  <div className="stats-card">
+                    <h3 className="stats-number">₹{(reportData.totalDeposits || 0).toLocaleString()}</h3>
+                    <p className="stats-label">Total Deposits</p>
+                  </div>
+                </div>
+                <div className="col-md-3 mb-3">
+                  <div className="stats-card">
+                    <h3 className="stats-number">₹{(reportData.netBalance || 0).toLocaleString()}</h3>
+                    <p className="stats-label">Net Balance</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      {selectedReport === 'agentwise' && (
+                        <>
+                          <th>Agent Name</th>
+                          <th>Phone</th>
+                          <th>Customers</th>
+                          <th>Transactions</th>
+                          <th>Deposits</th>
+                          <th>Withdrawals</th>
+                        </>
+                      )}
+                      {selectedReport === 'customerwise' && (
+                        <>
+                          <th>Customer Name</th>
+                          <th>Phone</th>
+                          <th>Agent</th>
+                          <th>Total Deposits</th>
+                          <th>Total Withdrawals</th>
+                          <th>Balance</th>
+                          <th>Status</th>
+                          <th>Join Date</th>
+                        </>
+                      )}
+                      {selectedReport === 'transactions' && (
+                        <>
+                          <th>Date</th>
+                          <th>Customer</th>
+                          <th>Agent</th>
+                          <th>Type</th>
+                          <th>Amount</th>
+                          <th>Mode</th>
+                        </>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.isArray(reportData) && reportData.map((row, index) => (
+                      <tr key={index}>
+                        {selectedReport === 'agentwise' && (
+                          <>
+                            <td>{row.agentName}</td>
+                            <td>{row.agentPhone}</td>
+                            <td>{row.totalCustomers}</td>
+                            <td>{row.totalTransactions}</td>
+                            <td>₹{(row.totalDeposits || 0).toLocaleString()}</td>
+                            <td>₹{(row.totalWithdrawals || 0).toLocaleString()}</td>
+                          </>
+                        )}
+                        {selectedReport === 'customerwise' && (
+                          <>
+                            <td>{row.customerName}</td>
+                            <td>{row.customerPhone}</td>
+                            <td>{row.agentName}</td>
+                            <td style={{ color: '#27ae60', fontWeight: 'bold' }}>₹{(row.totalDeposits || 0).toLocaleString()}</td>
+                            <td style={{ color: '#e74c3c', fontWeight: 'bold' }}>₹{(row.totalWithdrawals || 0).toLocaleString()}</td>
+                            <td>₹{(row.balance || 0).toLocaleString()}</td>
+                            <td><span className={`badge bg-${row.status === 'active' ? 'success' : 'danger'}`}>{row.status}</span></td>
+                            <td>{row.joinDate}</td>
+                          </>
+                        )}
+                        {selectedReport === 'transactions' && (
+                          <>
+                            <td>{row.date ? new Date(row.date).toLocaleDateString() : 'N/A'}</td>
+                            <td>{row.customerName}</td>
+                            <td>{row.agentName}</td>
+                            <td><span className={`badge bg-${row.type === 'deposit' ? 'success' : 'danger'}`}>{row.type}</span></td>
+                            <td>₹{(row.amount || 0).toLocaleString()}</td>
+                            <td>{row.mode}</td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="mt-3">
+              <button className="btn btn-primary me-2" onClick={() => window.print()}>
+                🖨️ Print Report
+              </button>
+              <button className="btn btn-success me-2" onClick={() => {
+                if (reportData) {
+                  const filename = `${selectedReport}_report`;
+                  exportToExcelWithFormat(Array.isArray(reportData) ? reportData : [reportData], filename);
+                }
+              }}>
+                📊 Export to Excel
+              </button>
+              <button className="btn btn-info" onClick={() => {
+                const dataStr = JSON.stringify(reportData, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${selectedReport}-report.json`;
+                link.click();
+              }}>
+                📥 Download JSON
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Generation Form */}
+      {selectedReport && (
+        <div className="card">
+          <div className="card-header">
+            <h6 className="mb-0">
+              {reportTypes.find(r => r.id === selectedReport)?.icon} {reportTypes.find(r => r.id === selectedReport)?.title}
+            </h6>
+          </div>
+          <div className="card-body">
+            <form onSubmit={handleGenerateReport}>
+              <div className="row">
+                <div className="col-md-6 mb-3">
+                  <label className="form-label">From Date</label>
+                  <input 
+                    type="date" 
+                    className="form-control" 
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                  />
+                </div>
+                <div className="col-md-6 mb-3">
+                  <label className="form-label">To Date</label>
+                  <input 
+                    type="date" 
+                    className="form-control" 
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                  />
+                </div>
+                {(selectedReport === 'agentwise' || selectedReport === 'transactions' || selectedReport === 'customerwise') && (
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Select Agent</label>
+                    <select 
+                      className="form-control"
+                      value={selectedAgent}
+                      onChange={(e) => setSelectedAgent(e.target.value)}
+                    >
+                      <option value="">All Agents</option>
+                      {agents.map(agent => (
+                        <option key={agent.phone} value={agent.phone}>
+                          {agent.name} ({agent.phone})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {(selectedReport === 'customerwise' || selectedReport === 'transactions') && (
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Select Customer</label>
+                    <select 
+                      className="form-control"
+                      value={selectedCustomer}
+                      onChange={(e) => setSelectedCustomer(e.target.value)}
+                    >
+                      <option value="">All Customers</option>
+                      {customers.map(customer => (
+                        <option key={customer.phone} value={customer.phone}>
+                          {customer.name} ({customer.phone})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {selectedReport === 'weekly' && (
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Week Number</label>
+                    <input 
+                      type="number" 
+                      className="form-control" 
+                      placeholder="Enter week number (1-52)" 
+                      min="1" 
+                      max="52"
+                      value={weekNumber}
+                      onChange={(e) => setWeekNumber(e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+              
+              <div className="d-flex justify-content-end gap-3 mt-4">
+                <button 
+                  type="button" 
+                  className="btn btn-outline-secondary"
+                  onClick={handleResetFilters}
+                >
+                  Reset
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  <span className="me-2">📄</span>
+                  Generate Report
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Stats - Dynamic */}
+      <div className="row mt-4">
+        <div className="col-md-3">
+          <div className="stats-card">
+            <div className="stats-icon" style={{ background: 'var(--primary-gradient)' }}>
+              👨‍💼
+            </div>
+            <h3 className="stats-number">{quickStats.activeAgents}</h3>
+            <p className="stats-label">Active Agents</p>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="stats-card">
+            <div className="stats-icon" style={{ background: 'var(--success-gradient)' }}>
+              📈
+            </div>
+            <h3 className="stats-number">₹{quickStats.totalCollections.toLocaleString()}</h3>
+            <p className="stats-label">Total Collections</p>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="stats-card">
+            <div className="stats-icon" style={{ background: 'var(--warning-gradient)' }}>
+              ⚠️
+            </div>
+            <h3 className="stats-number">₹{quickStats.totalPenalties.toLocaleString()}</h3>
+            <p className="stats-label">Total Penalties</p>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="stats-card">
+            <div className="stats-icon" style={{ background: 'var(--secondary-gradient)' }}>
+              🎁
+            </div>
+            <h3 className="stats-number">₹{quickStats.totalBonuses.toLocaleString()}</h3>
+            <p className="stats-label">Year-End Bonuses</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

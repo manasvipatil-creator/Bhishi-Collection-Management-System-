@@ -1,0 +1,267 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                    AUTHENTICATION FLOW DIAGRAM                                ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         INITIAL APP LOAD                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │   AuthContext Checks      │
+                    │   localStorage for        │
+                    │   existing session        │
+                    └───────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+                    ▼                               ▼
+        ┌─────────────────────┐       ┌─────────────────────┐
+        │  Session Found      │       │  No Session         │
+        │  ✓ User logged in   │       │  ✗ Not logged in    │
+        └─────────────────────┘       └─────────────────────┘
+                    │                               │
+                    ▼                               ▼
+        ┌─────────────────────┐       ┌─────────────────────┐
+        │  Allow access to    │       │  Redirect to        │
+        │  protected routes   │       │  /login page        │
+        └─────────────────────┘       └─────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         LOGIN PROCESS                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                    ┌───────────────────────────┐
+                    │   User visits /login      │
+                    └───────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │   Enter credentials:      │
+                    │   • Email                 │
+                    │   • Password              │
+                    └───────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │   Click Login Button      │
+                    └───────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │   Firebase Query:         │
+                    │   Get Admin node data     │
+                    └───────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+                    ▼                               ▼
+        ┌─────────────────────┐       ┌─────────────────────┐
+        │  Credentials Match  │       │  Credentials Wrong  │
+        │  ✓ Success          │       │  ✗ Error            │
+        └─────────────────────┘       └─────────────────────┘
+                    │                               │
+                    ▼                               ▼
+        ┌─────────────────────┐       ┌─────────────────────┐
+        │  Store session in   │       │  Show error message │
+        │  localStorage       │       │  Stay on login page │
+        └─────────────────────┘       └─────────────────────┘
+                    │
+                    ▼
+        ┌─────────────────────┐
+        │  Update AuthContext │
+        │  with user data     │
+        └─────────────────────┘
+                    │
+                    ▼
+        ┌─────────────────────┐
+        │  Redirect to        │
+        │  Dashboard (/)      │
+        └─────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         PROTECTED ROUTE ACCESS                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                    ┌───────────────────────────┐
+                    │   User tries to access    │
+                    │   protected route         │
+                    │   (e.g., /dashboard)      │
+                    └───────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │   ProtectedRoute checks   │
+                    │   isAuthenticated         │
+                    └───────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+                    ▼                               ▼
+        ┌─────────────────────┐       ┌─────────────────────┐
+        │  Authenticated      │       │  Not Authenticated  │
+        │  ✓ Logged in        │       │  ✗ No session       │
+        └─────────────────────┘       └─────────────────────┘
+                    │                               │
+                    ▼                               ▼
+        ┌─────────────────────┐       ┌─────────────────────┐
+        │  Render requested   │       │  Redirect to        │
+        │  page/component     │       │  /login             │
+        └─────────────────────┘       └─────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         LOGOUT PROCESS                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                    ┌───────────────────────────┐
+                    │   User clicks 🚪 Logout   │
+                    │   button in Navbar        │
+                    └───────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │   Show confirmation:      │
+                    │   "Are you sure you want  │
+                    │   to logout?"             │
+                    └───────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+                    ▼                               ▼
+        ┌─────────────────────┐       ┌─────────────────────┐
+        │  User clicks OK     │       │  User clicks Cancel │
+        │  ✓ Confirm logout   │       │  ✗ Stay logged in   │
+        └─────────────────────┘       └─────────────────────┘
+                    │                               │
+                    ▼                               ▼
+        ┌─────────────────────┐       ┌─────────────────────┐
+        │  Clear localStorage │       │  Close dialog       │
+        │  Remove session     │       │  Stay on page       │
+        └─────────────────────┘       └─────────────────────┘
+                    │
+                    ▼
+        ┌─────────────────────┐
+        │  Update AuthContext │
+        │  user = null        │
+        └─────────────────────┘
+                    │
+                    ▼
+        ┌─────────────────────┐
+        │  Redirect to        │
+        │  /login page        │
+        └─────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         FIREBASE STRUCTURE                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    Firebase Realtime Database
+            │
+            ├── Admin ◄─── Admin credentials stored here
+            │   ├── email: "admin123@gmail.com"
+            │   ├── password: "admin123"
+            │   ├── name: "Admin User"
+            │   ├── role: "Administrator"
+            │   └── createdAt: "2025-01-16T10:00:00.000Z"
+            │
+            ├── agents
+            │   └── [agent data...]
+            │
+            └── [other collections...]
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         COMPONENT HIERARCHY                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    App.js (wrapped in AuthProvider)
+        │
+        ├── Public Routes
+        │   ├── /login ──────────► Login.jsx
+        │   ├── /setup-admin ───► SetupAdmin.jsx
+        │   └── /agent-login ───► AgentLogin.jsx
+        │
+        └── Protected Routes (wrapped in ProtectedRoute)
+            │
+            ├── Sidebar.jsx
+            │
+            ├── Navbar.jsx ◄─── Contains Logout Button
+            │   ├── User Info Display
+            │   ├── Notifications
+            │   └── 🚪 Logout Button
+            │
+            └── Main Content
+                ├── / ──────────────► Dashboard.jsx
+                ├── /add-agent ─────► AddAgent.jsx
+                ├── /view-agents ───► ViewAgents.jsx
+                └── [other routes...]
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         STATE MANAGEMENT                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    AuthContext (Global State)
+        │
+        ├── State Variables:
+        │   ├── user: { email, name, role } or null
+        │   ├── loading: boolean
+        │   └── isAuthenticated: boolean
+        │
+        ├── Functions:
+        │   ├── login(userData) ──► Store user & session
+        │   └── logout() ─────────► Clear user & session
+        │
+        └── Storage:
+            └── localStorage["adminUser"] ◄─── Session persistence
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         KEY FEATURES                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ✓ Session Persistence
+      └─► Login once, stay logged in across page refreshes
+
+    ✓ Automatic Redirect
+      └─► Not logged in? Automatically sent to /login
+
+    ✓ Protected Routes
+      └─► All admin pages require authentication
+
+    ✓ Logout Confirmation
+      └─► Prevents accidental logout
+
+    ✓ User Display
+      └─► Shows logged-in user name and role in Navbar
+
+    ✓ Firebase Integration
+      └─► Credentials verified against Firebase database
+
+    ✓ Error Handling
+      └─► Shows error messages for invalid credentials
+
+    ✓ Loading States
+      └─► Visual feedback during authentication
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         SECURITY FLOW                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    Request to Protected Route
+            │
+            ▼
+    Check localStorage for session
+            │
+            ├─► Session exists ──► Verify not expired ──► Allow access
+            │                            │
+            │                            └─► Expired ──► Redirect to login
+            │
+            └─► No session ──────────────────────────────► Redirect to login
+
+═══════════════════════════════════════════════════════════════════════════════
