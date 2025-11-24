@@ -65,7 +65,7 @@ export default function ProcessWithdrawal() {
     }
   };
 
-  const calculatePenalty = (amount) => {
+  const calculatePenalty = async (amount) => {
     if (!eligibilityInfo || !amount) {
       setPenaltyInfo(null);
       return;
@@ -73,32 +73,62 @@ export default function ProcessWithdrawal() {
 
     const monthsCompleted = eligibilityInfo.monthsSinceStart;
     const totalBalance = eligibilityInfo.totalDeposits;
+    let actualWithdrawalAmount = amount;
     let penalty = 0;
     let penaltyApplied = false;
+    let bonusIncluded = false;
+    let reason = '';
 
-    if (monthsCompleted < 13) {
-      // Penalty is 5% of withdrawal amount
-      penalty = Math.floor(amount * 0.05);
-      penaltyApplied = true;
+    // NEW BONUS LOGIC: Check if customer is withdrawing full amount and bonus eligible
+    if (amount >= totalBalance && eligibilityInfo.bonusEligible) {
+      // Customer gets bonus (₹1,000 extra)
+      actualWithdrawalAmount = totalBalance + 1000;
+      bonusIncluded = true;
+      reason = `✅ Bonus included! 13th month eligible - Total: ₹${totalBalance.toLocaleString()} + ₹1,000 bonus`;
+    } else if (amount >= totalBalance && eligibilityInfo.eligible && !eligibilityInfo.bonusEligible) {
+      // Customer completed 12 months but 13th month hasn't started yet
+      actualWithdrawalAmount = totalBalance; // Only accumulated amount
+      reason = `12 months completed but 13th month not started. Bonus available from ${eligibilityInfo.thirteenthMonthStartDate}`;
+    } else if (monthsCompleted < 13) {
+      // Use new penalty calculation that checks last deposit date
+      try {
+        const { calculateWithdrawalPenalty } = await import('../utils/databaseHelpers');
+        const currentDate = new Date().toISOString().split('T')[0];
+        const penaltyResult = await calculateWithdrawalPenalty(amount, monthsCompleted, selectedAgent, selectedCustomer.phone, currentDate);
+        penalty = penaltyResult.penalty;
+        penaltyApplied = penaltyResult.penaltyApplied;
+        reason = penaltyResult.reason;
+      } catch (error) {
+        console.error("Error calculating penalty:", error);
+        // Fallback to old logic
+        penalty = Math.floor(amount * 0.05);
+        penaltyApplied = true;
+        reason = `Early withdrawal before 13 months - 5% penalty on withdrawal amount`;
+      }
+    } else {
+      reason = 'Partial withdrawal - No penalty';
     }
 
-    const netAmount = amount - penalty;
+    const netAmount = actualWithdrawalAmount - penalty;
 
     setPenaltyInfo({
       originalAmount: amount,
+      actualWithdrawalAmount: actualWithdrawalAmount,
       totalBalance: totalBalance,
       penalty,
       netAmount,
       penaltyApplied,
-      monthsCompleted,
-      reason: penaltyApplied ? `Early withdrawal before 13 months - 5% penalty on withdrawal amount` : 'No penalty - 13 months completed'
+      bonusIncluded,
+      bonusAmount: bonusIncluded ? 1000 : 0,
+      monthsCompleted: eligibilityInfo.completedMonths, // Use completedMonths instead of monthsSinceStart
+      reason
     });
   };
 
-  const handleAmountChange = (e) => {
+  const handleAmountChange = async (e) => {
     const amount = parseFloat(e.target.value) || 0;
     setWithdrawalAmount(e.target.value);
-    calculatePenalty(amount);
+    await calculatePenalty(amount);
   };
 
   const numberToWords = (num) => {
@@ -135,14 +165,23 @@ export default function ProcessWithdrawal() {
       return;
     }
 
-    if (!window.confirm(
-      `Process withdrawal for ${selectedCustomer.name}?\n\n` +
+    let confirmMessage = `Process withdrawal for ${selectedCustomer.name}?\n\n` +
       `Total Balance: ₹${penaltyInfo.totalBalance.toLocaleString()}\n` +
-      `Withdrawal Amount: ₹${penaltyInfo.originalAmount.toLocaleString()}\n` +
-      `Penalty (5% of withdrawal): ₹${penaltyInfo.penalty.toLocaleString()}\n` +
-      `Net Amount to Pay: ₹${penaltyInfo.netAmount.toLocaleString()}\n\n` +
-      `Months Completed: ${penaltyInfo.monthsCompleted} / 13`
-    )) {
+      `Requested Amount: ₹${penaltyInfo.originalAmount.toLocaleString()}\n`;
+    
+    if (penaltyInfo.bonusIncluded) {
+      confirmMessage += `✅ BONUS INCLUDED!\n` +
+        `Accumulated Amount: ₹${penaltyInfo.totalBalance.toLocaleString()}\n` +
+        `Bonus Amount: ₹${penaltyInfo.bonusAmount.toLocaleString()}\n` +
+        `Total Withdrawal: ₹${penaltyInfo.actualWithdrawalAmount.toLocaleString()}\n`;
+    } else if (penaltyInfo.penaltyApplied) {
+      confirmMessage += `Penalty (5% of withdrawal): ₹${penaltyInfo.penalty.toLocaleString()}\n`;
+    }
+    
+    confirmMessage += `Net Amount to Pay: ₹${penaltyInfo.netAmount.toLocaleString()}\n\n` +
+      `Months Completed: ${penaltyInfo.monthsCompleted} / 13`;
+
+    if (!window.confirm(confirmMessage)) {
       return;
     }
 
@@ -166,14 +205,25 @@ export default function ProcessWithdrawal() {
       setShowReceipt(true);
 
       // Show success message
-      alert(
-        `Withdrawal processed successfully!\n\n` +
-        `Original Amount: ₹${result.originalAmount.toLocaleString()}\n` +
-        `Penalty: ₹${result.penalty.toLocaleString()}\n` +
-        `Net Amount Paid: ₹${result.netAmount.toLocaleString()}\n` +
+      let successMessage = `Withdrawal processed successfully!\n\n`;
+      
+      if (result.bonusIncluded) {
+        successMessage += `✅ BONUS INCLUDED!\n` +
+          `Accumulated Amount: ₹${result.totalBalance.toLocaleString()}\n` +
+          `Bonus Amount: ₹${result.bonusAmount.toLocaleString()}\n` +
+          `Total Amount: ₹${result.actualWithdrawalAmount.toLocaleString()}\n`;
+      } else {
+        successMessage += `Requested Amount: ₹${result.originalAmount.toLocaleString()}\n`;
+        if (result.penaltyApplied) {
+          successMessage += `Penalty: ₹${result.penalty.toLocaleString()}\n`;
+        }
+      }
+      
+      successMessage += `Net Amount Paid: ₹${result.netAmount.toLocaleString()}\n` +
         `Transaction ID: ${result.transactionId}\n\n` +
-        `Receipt is displayed below. Click Print button to print.`
-      );
+        `Receipt is displayed below. Click Print button to print.`;
+      
+      alert(successMessage);
 
     } catch (error) {
       console.error("Error processing withdrawal:", error);
@@ -239,16 +289,21 @@ export default function ProcessWithdrawal() {
               </div>
             </div>
 
-            {/* Penalty Warning */}
-            {receiptData.penaltyApplied ? (
+            {/* Bonus/Penalty Information */}
+            {receiptData.bonusIncluded ? (
+              <div className="alert alert-success mb-4">
+                <strong>🎉 BONUS INCLUDED!</strong><br />
+                Customer completed 12 months and 13th month has started. ₹1,000 bonus added to withdrawal.
+              </div>
+            ) : receiptData.penaltyApplied ? (
               <div className="alert alert-warning mb-4">
                 <strong>⚠️ Early Withdrawal Penalty Applied</strong><br />
                 A 5% penalty has been deducted as the withdrawal is made before completing 13 months.
               </div>
             ) : (
-              <div className="alert alert-success mb-4">
-                <strong>✅ No Penalty</strong><br />
-                13 months completed. No penalty deducted.
+              <div className="alert alert-info mb-4">
+                <strong>ℹ️ Standard Withdrawal</strong><br />
+                No penalty or bonus applied.
               </div>
             )}
 
@@ -262,10 +317,22 @@ export default function ProcessWithdrawal() {
                 <div className="col-6"><strong>Withdrawal Amount Requested:</strong></div>
                 <div className="col-6 text-end">₹{receiptData.originalAmount.toLocaleString('en-IN')}</div>
               </div>
+              {receiptData.bonusIncluded && (
+                <div className="row mb-2 text-success">
+                  <div className="col-6"><strong>Add: Bonus Amount:</strong></div>
+                  <div className="col-6 text-end">+ ₹{receiptData.bonusAmount.toLocaleString('en-IN')}</div>
+                </div>
+              )}
               {receiptData.penaltyApplied && (
                 <div className="row mb-2 text-danger">
                   <div className="col-6"><strong>Less: Penalty (5% of withdrawal):</strong></div>
                   <div className="col-6 text-end">- ₹{receiptData.penalty.toLocaleString('en-IN')}</div>
+                </div>
+              )}
+              {receiptData.bonusIncluded && (
+                <div className="row mb-2">
+                  <div className="col-6"><strong>Total Withdrawal Amount:</strong></div>
+                  <div className="col-6 text-end">₹{receiptData.actualWithdrawalAmount.toLocaleString('en-IN')}</div>
                 </div>
               )}
               <div className="row border-top pt-2 mt-2">
@@ -348,7 +415,7 @@ export default function ProcessWithdrawal() {
             </div>
             <div>
               <h4 className="mb-1 fw-bold">Process Withdrawal</h4>
-              <p className="mb-0 opacity-75">5% penalty (on withdrawal amount) applies for withdrawals before 13 months</p>
+              <p className="mb-0 opacity-75">₹1,000 bonus available from 13th month start • 5% penalty for early withdrawals</p>
             </div>
           </div>
         </div>
@@ -409,20 +476,28 @@ export default function ProcessWithdrawal() {
 
                   {/* Customer Eligibility Info */}
                   {eligibilityInfo && (
-                    <div className="alert alert-info mb-3">
-                      <h6 className="alert-heading">Customer Information</h6>
+                    <div className={`alert mb-3 ${eligibilityInfo.bonusEligible ? 'alert-success' : eligibilityInfo.eligible ? 'alert-warning' : 'alert-info'}`}>
+                      <h6 className="alert-heading">
+                        {eligibilityInfo.bonusEligible ? '✅ Bonus Eligible!' : 
+                         eligibilityInfo.eligible ? '⏳ Bonus Pending' : 
+                         'ℹ️ Customer Information'}
+                      </h6>
                       <div className="row">
                         <div className="col-md-6">
                           <small>
                             <strong>Start Date:</strong> {eligibilityInfo.startDate}<br />
                             <strong>Months Since Start:</strong> {eligibilityInfo.monthsSinceStart} months<br />
-                            <strong>Completed Months:</strong> {eligibilityInfo.completedMonths} / 12
+                            <strong>Completed Months:</strong> {eligibilityInfo.completedMonths} / 12<br />
+                            {eligibilityInfo.thirteenthMonthStartDate && (
+                              <><strong>13th Month Starts:</strong> {eligibilityInfo.thirteenthMonthStartDate}</>
+                            )}
                           </small>
                         </div>
                         <div className="col-md-6">
                           <small>
                             <strong>Total Deposits:</strong> ₹{eligibilityInfo.totalDeposits.toLocaleString()}<br />
-                            <strong>Bonus Eligible:</strong> {eligibilityInfo.eligible ? '✅ Yes' : '❌ No'}<br />
+                            <strong>12 Months Completed:</strong> {eligibilityInfo.eligible ? '✅ Yes' : '❌ No'}<br />
+                            <strong>Bonus Available:</strong> {eligibilityInfo.bonusEligible ? '✅ Yes (₹1,000)' : '❌ No'}<br />
                             <strong>Status:</strong> {eligibilityInfo.reason}
                           </small>
                         </div>
@@ -446,11 +521,13 @@ export default function ProcessWithdrawal() {
                     </div>
                   )}
 
-                  {/* Penalty Calculation */}
+                  {/* Penalty/Bonus Calculation */}
                   {penaltyInfo && (
-                    <div className={`alert ${penaltyInfo.penaltyApplied ? 'alert-warning' : 'alert-success'} mb-3`}>
+                    <div className={`alert mb-3 ${penaltyInfo.bonusIncluded ? 'alert-success' : penaltyInfo.penaltyApplied ? 'alert-warning' : 'alert-info'}`}>
                       <h6 className="alert-heading">
-                        {penaltyInfo.penaltyApplied ? '⚠️ Penalty Applied' : '✅ No Penalty'}
+                        {penaltyInfo.bonusIncluded ? '🎉 Bonus Included!' : 
+                         penaltyInfo.penaltyApplied ? '⚠️ Penalty Applied' : 
+                         '✅ No Penalty'}
                       </h6>
                       <div className="row mb-3">
                         <div className="col-md-3">
@@ -458,18 +535,45 @@ export default function ProcessWithdrawal() {
                           <h5 className="mb-0 text-primary">₹{penaltyInfo.totalBalance.toLocaleString()}</h5>
                         </div>
                         <div className="col-md-3">
-                          <strong>Withdrawal Amount:</strong><br />
+                          <strong>Requested Amount:</strong><br />
                           <h5 className="mb-0">₹{penaltyInfo.originalAmount.toLocaleString()}</h5>
                         </div>
-                        <div className="col-md-3">
-                          <strong>Penalty (5% of withdrawal):</strong><br />
-                          <h5 className="mb-0 text-danger">- ₹{penaltyInfo.penalty.toLocaleString()}</h5>
-                        </div>
+                        {penaltyInfo.bonusIncluded ? (
+                          <div className="col-md-3">
+                            <strong>Bonus Amount:</strong><br />
+                            <h5 className="mb-0 text-success">+ ₹{penaltyInfo.bonusAmount.toLocaleString()}</h5>
+                          </div>
+                        ) : penaltyInfo.penaltyApplied ? (
+                          <div className="col-md-3">
+                            <strong>Penalty (5% of withdrawal):</strong><br />
+                            <h5 className="mb-0 text-danger">- ₹{penaltyInfo.penalty.toLocaleString()}</h5>
+                          </div>
+                        ) : (
+                          <div className="col-md-3">
+                            <strong>Penalty:</strong><br />
+                            <h5 className="mb-0 text-muted">₹0</h5>
+                          </div>
+                        )}
                         <div className="col-md-3">
                           <strong>Net Amount:</strong><br />
                           <h5 className="mb-0 text-success">₹{penaltyInfo.netAmount.toLocaleString()}</h5>
                         </div>
                       </div>
+                      {penaltyInfo.bonusIncluded && (
+                        <div className="bg-success bg-opacity-10 p-3 rounded mb-3">
+                          <div className="row">
+                            <div className="col-md-4">
+                              <strong>Accumulated:</strong> ₹{penaltyInfo.totalBalance.toLocaleString()}
+                            </div>
+                            <div className="col-md-4">
+                              <strong>Bonus:</strong> ₹{penaltyInfo.bonusAmount.toLocaleString()}
+                            </div>
+                            <div className="col-md-4">
+                              <strong>Total:</strong> ₹{penaltyInfo.actualWithdrawalAmount.toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       <hr />
                       <small>
                         <strong>Reason:</strong> {penaltyInfo.reason}<br />
@@ -510,40 +614,52 @@ export default function ProcessWithdrawal() {
 
         {/* Info Panel */}
         <div className="col-lg-4">
-          <div className="card border-warning">
-            <div className="card-header bg-warning text-dark">
-              <h6 className="mb-0">⚠️ Withdrawal Policy</h6>
+          <div className="card border-success">
+            <div className="card-header bg-success text-white">
+              <h6 className="mb-0">🎉 Bonus & Withdrawal Policy</h6>
             </div>
             <div className="card-body">
-              <h6 className="text-danger">Early Withdrawal Penalty</h6>
+              <h6 className="text-success">✅ Bonus Eligibility (NEW)</h6>
               <p className="small mb-3">
-                A 5% penalty is calculated on the <strong>withdrawal amount</strong> and deducted from withdrawals made before completing 13 months.
+                <strong>12 months completed + 13th month started = ₹1,000 bonus!</strong><br />
+                Bonus is automatically added to full withdrawals when eligible.
               </p>
 
-              <h6 className="text-success">No Penalty</h6>
+              <h6 className="text-warning">⏳ Bonus Pending</h6>
               <p className="small mb-3">
-                Withdrawals after 13 months have no penalty deduction.
+                Customer completed 12 months but 13th month hasn't started yet. Only accumulated amount (₹12,000) available.
+              </p>
+
+              <h6 className="text-danger">⚠️ Early Withdrawal Penalty</h6>
+              <p className="small mb-3">
+                5% penalty on withdrawal amount for withdrawals before completing 12 months.
               </p>
 
               <hr />
 
-              <h6>Calculation Example:</h6>
-              <div className="bg-light p-3 rounded">
+              <h6>Examples:</h6>
+              <div className="bg-success bg-opacity-10 p-3 rounded mb-2">
                 <small>
-                  <strong>Scenario 1: Before 13 months</strong><br />
-                  Total Balance: ₹15,550<br />
-                  Withdrawal: ₹600<br />
-                  Penalty (5% of ₹600): ₹30<br />
-                  <strong>Net Amount: ₹570</strong>
+                  <strong>✅ With Bonus (13th month started)</strong><br />
+                  Balance: ₹12,000<br />
+                  Bonus: ₹1,000<br />
+                  <strong>Total Paid: ₹13,000</strong>
                 </small>
               </div>
-              <div className="bg-light p-3 rounded mt-2">
+              <div className="bg-warning bg-opacity-10 p-3 rounded mb-2">
                 <small>
-                  <strong>Scenario 2: After 13 months</strong><br />
-                  Total Balance: ₹15,550<br />
-                  Withdrawal: ₹10,000<br />
-                  Penalty: ₹0<br />
-                  <strong>Net Amount: ₹10,000</strong>
+                  <strong>⏳ Before 13th Month</strong><br />
+                  Balance: ₹12,000<br />
+                  Bonus: ₹0 (not yet available)<br />
+                  <strong>Total Paid: ₹12,000</strong>
+                </small>
+              </div>
+              <div className="bg-danger bg-opacity-10 p-3 rounded">
+                <small>
+                  <strong>⚠️ Early Withdrawal</strong><br />
+                  Withdrawal: ₹5,000<br />
+                  Penalty (5%): ₹250<br />
+                  <strong>Net Paid: ₹4,750</strong>
                 </small>
               </div>
             </div>
@@ -555,13 +671,14 @@ export default function ProcessWithdrawal() {
             </div>
             <div className="card-body">
               <ul className="small mb-0">
-                <li><strong>Penalty is 5% of withdrawal amount</strong></li>
-                <li>Penalty is calculated based on months since first deposit</li>
-                <li>13 months = 12 months + 1 bonus month</li>
-                <li>Early withdrawal affects bonus eligibility</li>
+                <li><strong>Bonus: ₹1,000 added when 13th month starts</strong></li>
+                <li><strong>Timing matters:</strong> Even 1-2 days after 13th month = Bonus eligible</li>
+                <li><strong>Before 13th month:</strong> Only accumulated amount (₹12,000)</li>
+                <li><strong>Penalty:</strong> 5% of withdrawal amount for early withdrawals</li>
+                <li>13th month starts exactly 12 months after first deposit</li>
+                <li>Full withdrawal gets bonus, partial withdrawals don't</li>
                 <li>Transaction is recorded in customer's history</li>
-                <li>Net amount = Withdrawal amount - Penalty</li>
-                <li>Total balance is shown for reference</li>
+                <li>Receipt shows complete breakdown of amounts</li>
               </ul>
             </div>
           </div>

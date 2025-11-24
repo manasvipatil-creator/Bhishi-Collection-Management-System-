@@ -6,7 +6,6 @@ export default function YearEndBonus() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [filterStatus, setFilterStatus] = useState('all'); // all, eligible, ineligible
 
   useEffect(() => {
     loadEligibleCustomers();
@@ -42,8 +41,8 @@ export default function YearEndBonus() {
         
         if (bonusAmount > 0) {
           // Determine bonus type
-          const isFullBonus = bonusAmount === 13000;
-          const bonusType = isFullBonus ? 'Full Bonus (₹13,000)' : 'Accumulated Amount Only';
+          const isFullBonus = bonusAmount === 1000;
+          const bonusType = isFullBonus ? 'Full Bonus (₹1,000)' : 'No Bonus';
           
           // Record bonus transaction in agent's transactions
           await addTransactionToAgent(customer.agentPhone, {
@@ -69,7 +68,7 @@ export default function YearEndBonus() {
 
       alert(`Year-end bonuses processed successfully!\n\n` +
             `Total Customers: ${customersProcessed}\n` +
-            `Full Bonus (₹13,000): ${fullBonusCount}\n` +
+            `Full Bonus (₹12,000): ${fullBonusCount}\n` +
             `Accumulated Only: ${partialBonusCount}\n` +
             `Total Amount: ₹${totalBonusProcessed.toLocaleString()}`);
       
@@ -82,19 +81,12 @@ export default function YearEndBonus() {
     }
   };
 
-  // Filter customers based on selected status
-  const filteredCustomers = eligibleCustomers.filter(customer => {
-    if (filterStatus === 'eligible') {
-      return customer.bonusAmount === 13000;
-    } else if (filterStatus === 'ineligible') {
-      return customer.bonusAmount < 13000;
-    }
-    return true;
-  });
+  // Show all customers (no filtering)
+  const filteredCustomers = eligibleCustomers;
 
   const totalEligibleCustomers = eligibleCustomers.length;
-  const fullBonusCustomers = eligibleCustomers.filter(c => c.bonusAmount === 13000).length;
-  const partialBonusCustomers = eligibleCustomers.filter(c => c.bonusAmount < 13000).length;
+  const fullBonusCustomers = eligibleCustomers.filter(c => c.bonusAmount === 12000).length;
+  const partialBonusCustomers = eligibleCustomers.filter(c => c.bonusAmount < 12000).length;
   const totalBonusAmount = eligibleCustomers.reduce((sum, customer) => sum + customer.bonusAmount, 0);
 
   return (
@@ -111,8 +103,8 @@ export default function YearEndBonus() {
                 </div>
               </div>
               <div>
-                <h4 className="mb-1 fw-bold">Year-End Bonus System (13-Month Plan)</h4>
-                <p className="mb-0 opacity-75">₹13,000 bonus for customers completing 12 months + 13th month payments</p>
+                <h4 className="mb-1 fw-bold">Year-End Bonus System (12-Month Plan)</h4>
+                <p className="mb-0 opacity-75">₹12,000 bonus for customers completing 12 months with timely payments</p>
               </div>
             </div>
             <div className="text-end">
@@ -143,11 +135,11 @@ export default function YearEndBonus() {
           <div className="row">
             <div className="col-md-4">
               <div className="p-3 bg-success bg-opacity-10 rounded mb-3">
-                <h6 className="text-success mb-2">✅ Full Bonus (₹13,000)</h6>
+                <h6 className="text-success mb-2">✅ Full Bonus (₹12,000)</h6>
                 <ul className="mb-0 small">
                   <li>Complete 12 months of ₹1,000/month payments</li>
-                  <li>OR total deposits of ₹12,000</li>
-                  <li>AND complete 13th month payment without missing days</li>
+                  <li>Total deposits of ₹12,000</li>
+                  <li>AND 12th month payment made on time</li>
                 </ul>
               </div>
             </div>
@@ -155,8 +147,8 @@ export default function YearEndBonus() {
               <div className="p-3 bg-warning bg-opacity-10 rounded mb-3">
                 <h6 className="text-warning mb-2">⚠️ Accumulated Amount Only</h6>
                 <ul className="mb-0 small">
-                  <li>Completed 12 months but missed 13th month payment</li>
-                  <li>Receive only accumulated deposits (no extra ₹1,000 bonus)</li>
+                  <li>Completed 12 months but 12th month payment was delayed</li>
+                  <li>Receive only accumulated deposits (no bonus)</li>
                 </ul>
               </div>
             </div>
@@ -164,8 +156,8 @@ export default function YearEndBonus() {
               <div className="p-3 bg-danger bg-opacity-10 rounded mb-3">
                 <h6 className="text-danger mb-2">❌ Early Withdrawal Penalty</h6>
                 <ul className="mb-0 small">
-                  <li>5% deduction on withdrawals before 13 months</li>
-                  <li>No penalty after completing 13 months</li>
+                  <li>5% deduction on withdrawals before 12 months</li>
+                  <li>No penalty after completing 12 months</li>
                 </ul>
               </div>
             </div>
@@ -249,26 +241,8 @@ export default function YearEndBonus() {
 
       {/* Customer Bonus Details */}
       <div className="card">
-        <div className="card-header d-flex justify-content-between align-items-center">
+        <div className="card-header">
           <h6 className="mb-0">Customer Bonus Details - {selectedYear}</h6>
-          <div>
-            <button 
-              className="btn btn-sm btn-outline-secondary me-2"
-              onClick={() => loadEligibleCustomers()}
-              disabled={loading}
-            >
-              🔄 Refresh
-            </button>
-            <select 
-              className="form-select form-select-sm d-inline-block w-auto"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              <option value="all">All Customers ({totalEligibleCustomers})</option>
-              <option value="eligible">Full Bonus ({fullBonusCustomers})</option>
-              <option value="ineligible">Accumulated Only ({partialBonusCustomers})</option>
-            </select>
-          </div>
         </div>
         <div className="card-body p-0">
           {loading ? (
@@ -292,15 +266,16 @@ export default function YearEndBonus() {
                     <th>Start Date</th>
                     <th>Months Completed</th>
                     <th>Total Deposits</th>
-                    <th>13th Month Status</th>
+                    <th>12th Month Status</th>
                     <th>Bonus Amount</th>
+                    <th>Total Amount Pay</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredCustomers.map((customer, index) => {
-                    const isFullBonus = customer.bonusAmount === 13000;
-                    const thirteenthMonth = customer.thirteenthMonthStatus;
+                    const isFullBonus = customer.bonusAmount === 1000;
+                    const twelfthMonth = customer.twelfthMonthStatus;
 
                     return (
                       <tr key={index} className={!isFullBonus ? 'table-warning' : ''}>
@@ -324,22 +299,25 @@ export default function YearEndBonus() {
                         </td>
                         <td className="fw-bold">₹{customer.totalDeposits.toLocaleString()}</td>
                         <td>
-                          {thirteenthMonth.hasMissedPayment ? (
+                          {twelfthMonth.hasMissedPayment ? (
                             <span className="badge bg-warning text-dark">
-                              ⚠️ Missed ({thirteenthMonth.missedDays} days)
+                              ⚠️ Delayed ({twelfthMonth.missedDays} days)
                             </span>
                           ) : (
                             <span className="badge bg-success">
-                              ✅ Paid (₹{thirteenthMonth.amount})
+                              ✅ On Time (₹{twelfthMonth.amount})
                             </span>
                           )}
                         </td>
                         <td className="fw-bold">
                           {isFullBonus ? (
-                            <span className="text-success">₹13,000</span>
+                            <span className="text-success">₹1,000</span>
                           ) : (
                             <span className="text-warning">₹{customer.bonusAmount.toLocaleString()}</span>
                           )}
+                        </td>
+                        <td className="fw-bold text-primary">
+                          ₹{(customer.totalDeposits + customer.bonusAmount).toLocaleString()}
                         </td>
                         <td>
                           {isFullBonus ? (

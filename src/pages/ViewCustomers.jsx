@@ -62,6 +62,8 @@ export default function ViewCustomers() {
             name: customer.name || "Unknown",
             balance: customer.balance || customer.principalAmount || 0,
             accountNumber: customer.accountNumber || "N/A",
+            address: customer.address || "N/A",
+            village: customer.address ? customer.address.split(',')[0].replace('Village ', '').trim() : "N/A",
             active: customer.active !== undefined ? customer.active : true
           })
         );
@@ -103,7 +105,12 @@ export default function ViewCustomers() {
     const filtered = agents.filter(
       (agent) =>
         agent.agentName.toLowerCase().includes(value) ||
-        agent.agentId.toLowerCase().includes(value)
+        agent.agentId.toLowerCase().includes(value) ||
+        agent.customers.some(customer => 
+          customer.name.toLowerCase().includes(value) ||
+          customer.phoneNumber.includes(value) ||
+          customer.village.toLowerCase().includes(value)
+        )
     );
     setFilteredAgents(filtered);
   };
@@ -193,7 +200,7 @@ export default function ViewCustomers() {
           <input
             type="text"
             className="form-control"
-            placeholder="🔍 Search by Agent Name or ID..."
+            placeholder="🔍 Search by Agent Name, ID, Customer Name, Phone, or Village..."
             value={searchTerm}
             onChange={handleSearch}
           />
@@ -271,6 +278,7 @@ export default function ViewCustomers() {
                             <th>#</th>
                             <th>Customer Name</th>
                             <th>Phone</th>
+                            <th>Village</th>
                             <th>Account Number</th>
                             <th>Status</th>
                             <th>Action</th>
@@ -282,6 +290,7 @@ export default function ViewCustomers() {
                               <td>{index + 1}</td>
                               <td className="fw-semibold">{cust.name}</td>
                               <td>{cust.phoneNumber}</td>
+                              <td className="text-primary fw-semibold">{cust.village}</td>
                               <td className="text-muted">{cust.accountNumber}</td>
                               <td>
                                 <span className={`badge ${cust.active ? 'bg-success' : 'bg-danger'}`}>
@@ -326,6 +335,7 @@ export default function ViewCustomers() {
               <div className="modal-body">
                 <p><strong>Name:</strong> {selectedCustomer.name}</p>
                 <p><strong>Phone:</strong> {selectedCustomer.phoneNumber}</p>
+                <p><strong>Village:</strong> <span className="text-primary fw-semibold">{selectedCustomer.village}</span></p>
                 <p><strong>Account Number:</strong> {selectedCustomer.accountNumber}</p>
                 <p><strong>Principal Amount:</strong> {selectedCustomer.principalAmount}</p>
                 <p><strong>Interest Rate:</strong> {selectedCustomer.interestRate}</p>

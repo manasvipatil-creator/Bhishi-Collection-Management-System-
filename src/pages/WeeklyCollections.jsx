@@ -86,8 +86,11 @@ export default function WeeklyCollections() {
 
     // Extract time from transaction
     let timeString = null;
+    let paymentDate = null;
     if (weeklyTransactions.length > 0) {
       const firstTxn = weeklyTransactions[0];
+      paymentDate = firstTxn.date;
+      
       if (firstTxn.time) {
         timeString = firstTxn.time;
       } else if (firstTxn.createdAt) {
@@ -104,10 +107,28 @@ export default function WeeklyCollections() {
     return {
       paid: weeklyTransactions.length > 0,
       amount: totalPaid,
-      date: weeklyTransactions[0]?.date || null,
+      date: paymentDate,
       time: timeString,
-      transactions: weeklyTransactions
+      transactions: weeklyTransactions,
+      weeklyTarget: getCustomerWeeklyTarget(customer),
+      paymentStatus: totalPaid > 0 ? 'Paid' : 'No Payment'
     };
+  };
+
+  const getCustomerWeeklyTarget = (customer) => {
+    // Calculate dynamic weekly target based on customer's plan
+    // This could be based on monthly due, total plan amount, or custom weekly amount
+    if (customer.weeklyAmount) {
+      return Number(customer.weeklyAmount);
+    } else if (customer.monthlyDue) {
+      return Number(customer.monthlyDue) / 4; // Approximate weekly from monthly
+    } else if (customer.totalAmount) {
+      // If total amount for 12 months, divide by 52 weeks
+      return Number(customer.totalAmount) / 52;
+    } else {
+      // Default weekly amount if no other data available
+      return 1000; // Default ₹1000 per week
+    }
   };
 
   const calculatePenalty = (customer) => {
@@ -212,6 +233,32 @@ export default function WeeklyCollections() {
 
   const customersByAgent = getCustomersByAgent();
 
+  // Calculate dynamic statistics
+  const getWeeklyStatistics = () => {
+    const totalCustomers = filteredCustomers.length;
+    const paidCustomers = filteredCustomers.filter(c => getCustomerWeeklyStatus(c).paid);
+    const unpaidCustomers = filteredCustomers.filter(c => !getCustomerWeeklyStatus(c).paid);
+    
+    const totalTargetAmount = filteredCustomers.reduce((sum, c) => sum + getCustomerWeeklyStatus(c).weeklyTarget, 0);
+    const totalCollectedAmount = filteredCustomers.reduce((sum, c) => sum + getCustomerWeeklyStatus(c).amount, 0);
+    
+    const collectionRate = totalCustomers > 0 ? (paidCustomers.length / totalCustomers) * 100 : 0;
+    const amountCollectionRate = totalTargetAmount > 0 ? (totalCollectedAmount / totalTargetAmount) * 100 : 0;
+    
+    return {
+      totalCustomers,
+      paidCount: paidCustomers.length,
+      unpaidCount: unpaidCustomers.length,
+      totalTargetAmount,
+      totalCollectedAmount,
+      collectionRate,
+      amountCollectionRate,
+      shortfall: totalTargetAmount - totalCollectedAmount
+    };
+  };
+
+  const weeklyStats = getWeeklyStatistics();
+
   return (
     <div className="container-fluid fade-in-up">
       {/* Header */}
@@ -290,15 +337,21 @@ export default function WeeklyCollections() {
                 <button 
                   className="btn btn-success"
                   onClick={() => {
-                    const exportData = filteredCustomers.map(customer => ({
-                      'Customer Name': customer.name,
-                      'Phone': customer.phone,
-                      'Agent': customer.agentName,
-                      'Weekly Amount': customer.weeklyAmount || 0,
-                      'Status': customer.weeklyStatus,
-                      'Amount Paid': customer.weeklyAmountPaid || 0,
-                      'Payment Date': customer.weeklyPaymentDate || 'N/A'
-                    }));
+                    const exportData = filteredCustomers.map(customer => {
+                      const status = getCustomerWeeklyStatus(customer);
+                      return {
+                        'Customer Name': customer.name,
+                        'Phone': customer.phone,
+                        'Agent': customer.agentName,
+                        'Weekly Target': status.weeklyTarget,
+                        'Amount Paid': status.amount,
+                        'Status': status.paymentStatus,
+                        'Payment Date': status.date ? new Date(status.date).toLocaleDateString('en-IN') : 'N/A',
+                        'Payment Time': status.time || 'N/A',
+                        'Week Number': selectedWeek,
+                        'Collection Rate': status.amount > 0 ? ((status.amount / status.weeklyTarget) * 100).toFixed(1) + '%' : '0%'
+                      };
+                    });
                     exportToExcelWithFormat(exportData, `weekly_collections_week_${selectedWeek}`);
                   }}
                 >
@@ -363,7 +416,7 @@ export default function WeeklyCollections() {
                 <tbody>
                   {/* Paid Customers First */}
                   {paidCustomers.map((customer, idx) => {
-                    const weeklyAmt = Number(customer.monthlyDue || 0) / 4;
+                    const weeklyAmt = getCustomerWeeklyTarget(customer);
                     return (
                       <tr key={idx} style={{ background: '#f0fff0' }}>
                         <td style={{ border: '1px solid #ddd', padding: '6px' }}>
@@ -391,7 +444,7 @@ export default function WeeklyCollections() {
                   })}
                   {/* Unpaid Customers */}
                   {unpaidCustomers.map((customer, idx) => {
-                    const weeklyAmt = Number(customer.monthlyDue || 0) / 4;
+                    const weeklyAmt = getCustomerWeeklyTarget(customer);
                     return (
                       <tr key={idx} style={{ background: '#fff8f0' }}>
                         <td style={{ border: '1px solid #ddd', padding: '6px' }}>
@@ -469,6 +522,42 @@ export default function WeeklyCollections() {
         </div>
       </div>
 
+      {/* Dynamic Statistics Dashboard */}
+      <div className="row mb-4">
+        <div className="col-md-3">
+          <div className="card border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+            <div className="card-body text-center">
+              <h3 className="fw-bold mb-1">{weeklyStats.totalCustomers}</h3>
+              <p className="mb-0 opacity-75">Total Customers</p>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="card border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', color: 'white' }}>
+            <div className="card-body text-center">
+              <h3 className="fw-bold mb-1">{weeklyStats.paidCount}</h3>
+              <p className="mb-0 opacity-75">Paid ({weeklyStats.collectionRate.toFixed(1)}%)</p>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="card border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #fc466b 0%, #3f5efb 100%)', color: 'white' }}>
+            <div className="card-body text-center">
+              <h3 className="fw-bold mb-1">₹{weeklyStats.totalCollectedAmount.toLocaleString()}</h3>
+              <p className="mb-0 opacity-75">Collected ({weeklyStats.amountCollectionRate.toFixed(1)}%)</p>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="card border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}>
+            <div className="card-body text-center">
+              <h3 className="fw-bold mb-1">₹{weeklyStats.shortfall.toLocaleString()}</h3>
+              <p className="mb-0 opacity-75">Shortfall</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Collections Table - Screen view only */}
       <div className="card border-0 shadow-sm screen-only">
         <div className="card-header" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '20px' }}>
@@ -498,7 +587,7 @@ export default function WeeklyCollections() {
                     const status = getCustomerWeeklyStatus(customer);
                     const penalty = calculatePenalty(customer);
                     const bonus = calculateYearEndBonus(customer);
-                    const weeklyAmount = Number(customer.monthlyDue || 0) / 4; // Approximate weekly from monthly
+                    const weeklyAmount = status.weeklyTarget; // Use dynamic weekly target
 
                     return (
                       <tr key={customer.id} style={{ borderBottom: '1px solid #f0f0f0' }}>

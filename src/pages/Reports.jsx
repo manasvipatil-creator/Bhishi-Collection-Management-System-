@@ -54,6 +54,8 @@ export default function Reports() {
         return generateCustomerWiseReport();
       case "transactions":
         return generateTransactionReport();
+      case "daily":
+        return generateDailyTransactionReport();
       case "summary":
         return generateSummaryReport();
       default:
@@ -147,6 +149,62 @@ export default function Reports() {
     }));
   };
 
+  const generateDailyTransactionReport = () => {
+    let filteredTransactions = transactions;
+    
+    // Apply filters
+    if (fromDate) {
+      filteredTransactions = filteredTransactions.filter(t => new Date(t.date) >= new Date(fromDate));
+    }
+    if (toDate) {
+      filteredTransactions = filteredTransactions.filter(t => new Date(t.date) <= new Date(toDate));
+    }
+    if (selectedAgent) {
+      filteredTransactions = filteredTransactions.filter(t => t.agentPhone === selectedAgent);
+    }
+    if (selectedCustomer) {
+      filteredTransactions = filteredTransactions.filter(t => t.customerPhone === selectedCustomer);
+    }
+
+    // Group transactions by date
+    const dailyGroups = {};
+    filteredTransactions.forEach(t => {
+      const date = t.date || 'Unknown Date';
+      if (!dailyGroups[date]) {
+        dailyGroups[date] = {
+          date: date,
+          transactions: [],
+          totalDeposits: 0,
+          totalWithdrawals: 0,
+          totalTransactions: 0,
+          uniqueCustomers: new Set(),
+          uniqueAgents: new Set()
+        };
+      }
+      
+      dailyGroups[date].transactions.push(t);
+      dailyGroups[date].totalTransactions++;
+      dailyGroups[date].uniqueCustomers.add(t.customerPhone);
+      dailyGroups[date].uniqueAgents.add(t.agentPhone);
+      
+      if (t.type === 'deposit') {
+        dailyGroups[date].totalDeposits += (t.amount || 0);
+      } else if (t.type === 'withdrawal') {
+        dailyGroups[date].totalWithdrawals += (t.netAmount || t.amount || 0);
+      }
+    });
+
+    // Convert to array and add calculated fields
+    return Object.values(dailyGroups)
+      .map(group => ({
+        ...group,
+        uniqueCustomers: group.uniqueCustomers.size,
+        uniqueAgents: group.uniqueAgents.size,
+        netCollection: group.totalDeposits - group.totalWithdrawals
+      }))
+      .sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort by date descending
+  };
+
   const generateSummaryReport = () => {
     let filteredTransactions = transactions;
     
@@ -229,10 +287,17 @@ export default function Reports() {
       color: "var(--success-gradient)"
     },
     {
+      id: "daily",
+      title: "Daily Transactions Report",
+      description: "View daily transaction summaries with deposits, withdrawals and statistics",
+      icon: "📅",
+      color: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
+    },
+    {
       id: "weekly",
       title: "Weekly Collections Report",
       description: "Track weekly collection performance and missed payments",
-      icon: "📅",
+      icon: "📊",
       color: "var(--warning-gradient)"
     },
     {
@@ -248,13 +313,6 @@ export default function Reports() {
       description: "Comprehensive transaction history with deposits and withdrawals",
       icon: "💳",
       color: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-    },
-    {
-      id: "summary",
-      title: "Business Summary",
-      description: "Overall business performance and financial summary",
-      icon: "📊",
-      color: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
     }
   ];
 
@@ -368,6 +426,17 @@ export default function Reports() {
                           <th>Join Date</th>
                         </>
                       )}
+                      {selectedReport === 'daily' && (
+                        <>
+                          <th>Date</th>
+                          <th>Total Transactions</th>
+                          <th>Deposits</th>
+                          <th>Withdrawals</th>
+                          <th>Net Collection</th>
+                          <th>Customers</th>
+                          <th>Agents</th>
+                        </>
+                      )}
                       {selectedReport === 'transactions' && (
                         <>
                           <th>Date</th>
@@ -405,6 +474,39 @@ export default function Reports() {
                             <td>{row.joinDate}</td>
                           </>
                         )}
+                        {selectedReport === 'daily' && (
+                          <>
+                            <td>
+                              <strong>{new Date(row.date).toLocaleDateString('en-IN', { 
+                                weekday: 'short', 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric' 
+                              })}</strong>
+                            </td>
+                            <td>
+                              <span className="badge bg-primary">{row.totalTransactions}</span>
+                            </td>
+                            <td style={{ color: '#27ae60', fontWeight: 'bold' }}>
+                              ₹{(row.totalDeposits || 0).toLocaleString()}
+                            </td>
+                            <td style={{ color: '#e74c3c', fontWeight: 'bold' }}>
+                              ₹{(row.totalWithdrawals || 0).toLocaleString()}
+                            </td>
+                            <td style={{ 
+                              color: row.netCollection >= 0 ? '#27ae60' : '#e74c3c', 
+                              fontWeight: 'bold' 
+                            }}>
+                              ₹{(row.netCollection || 0).toLocaleString()}
+                            </td>
+                            <td>
+                              <span className="badge bg-info">{row.uniqueCustomers}</span>
+                            </td>
+                            <td>
+                              <span className="badge bg-secondary">{row.uniqueAgents}</span>
+                            </td>
+                          </>
+                        )}
                         {selectedReport === 'transactions' && (
                           <>
                             <td>{row.date ? new Date(row.date).toLocaleDateString() : 'N/A'}</td>
@@ -425,24 +527,13 @@ export default function Reports() {
               <button className="btn btn-primary me-2" onClick={() => window.print()}>
                 🖨️ Print Report
               </button>
-              <button className="btn btn-success me-2" onClick={() => {
+              <button className="btn btn-success" onClick={() => {
                 if (reportData) {
                   const filename = `${selectedReport}_report`;
                   exportToExcelWithFormat(Array.isArray(reportData) ? reportData : [reportData], filename);
                 }
               }}>
                 📊 Export to Excel
-              </button>
-              <button className="btn btn-info" onClick={() => {
-                const dataStr = JSON.stringify(reportData, null, 2);
-                const dataBlob = new Blob([dataStr], { type: 'application/json' });
-                const url = URL.createObjectURL(dataBlob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `${selectedReport}-report.json`;
-                link.click();
-              }}>
-                📥 Download JSON
               </button>
             </div>
           </div>
@@ -478,7 +569,7 @@ export default function Reports() {
                     onChange={(e) => setToDate(e.target.value)}
                   />
                 </div>
-                {(selectedReport === 'agentwise' || selectedReport === 'transactions' || selectedReport === 'customerwise') && (
+                {(selectedReport === 'agentwise' || selectedReport === 'transactions' || selectedReport === 'customerwise' || selectedReport === 'daily') && (
                   <div className="col-md-6 mb-3">
                     <label className="form-label">Select Agent</label>
                     <select 
@@ -495,7 +586,7 @@ export default function Reports() {
                     </select>
                   </div>
                 )}
-                {(selectedReport === 'customerwise' || selectedReport === 'transactions') && (
+                {(selectedReport === 'customerwise' || selectedReport === 'transactions' || selectedReport === 'daily') && (
                   <div className="col-md-6 mb-3">
                     <label className="form-label">Select Customer</label>
                     <select 

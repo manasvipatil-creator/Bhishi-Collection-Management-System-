@@ -112,7 +112,10 @@ export default function AllData() {
                               <p><strong>Password:</strong> {agentInfo.password ? '••••••••' : 'N/A'}</p>
                               <p><strong>Routes:</strong> {
                                 agentInfo.routes ? 
-                                  (Array.isArray(agentInfo.routes) ? agentInfo.routes.join(', ') : agentInfo.routes) : 
+                                  (Array.isArray(agentInfo.routes) ? 
+                                    agentInfo.routes.map(r => typeof r === 'object' ? r.name : r).join(', ') : 
+                                    (typeof agentInfo.routes === 'object' ? agentInfo.routes.name : agentInfo.routes)
+                                  ) : 
                                   'N/A'
                               }</p>
                               <p><strong>Status:</strong> 

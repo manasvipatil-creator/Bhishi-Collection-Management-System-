@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { ref, push, set, update, onValue } from "firebase/database";
 import { db } from "../firebase";
 import { addAgentWithId, generateUniqueAgentId } from "../utils/agentIdRestructure";
+import { addSampleRoutes } from "../utils/addSampleRoutes";
 
 export default function AddAgent() {
   const navigate = useNavigate();
@@ -48,11 +49,24 @@ export default function AddAgent() {
   // Load agent data in edit mode
   useEffect(() => {
     if (isEditMode && editAgent) {
+      // Normalize routes to ensure they're always in array format
+      let routes = editAgent.routes || [];
+      if (!Array.isArray(routes)) {
+        routes = [];
+      }
+      // Convert any route objects to strings (for backward compatibility)
+      routes = routes.map(route => {
+        if (typeof route === 'object' && route !== null) {
+          return route.name || 'Unknown Route';
+        }
+        return route;
+      });
+      
       setAgent({
         agentName: editAgent.agentName || "",
         mobileNumber: editAgent.mobileNumber || editAgent.id || "",
         password: editAgent.password || "",
-        routes: editAgent.routes || [],
+        routes: routes,
         status: editAgent.status || "active"
       });
       setPreviewAgentId(editAgent.agentId || editAgent.id);
@@ -155,14 +169,26 @@ export default function AddAgent() {
       return;
     }
 
-    if (agent.routes.includes(selectedRoute.name)) {
+    // Check if route already exists (check both string and object formats)
+    const routeExists = agent.routes.some(r => {
+      const routeName = typeof r === 'string' ? r : r.name;
+      return routeName === selectedRoute.name;
+    });
+
+    if (routeExists) {
       alert("This route is already added!");
       return;
     }
 
+    // Save route as object with name and villages
+    const routeObject = {
+      name: selectedRoute.name,
+      villages: selectedRoute.villages || []
+    };
+
     setAgent({
       ...agent,
-      routes: [...agent.routes, selectedRoute.name]
+      routes: [...agent.routes, routeObject]
     });
     setSelectedRouteId("");
   };
@@ -170,7 +196,10 @@ export default function AddAgent() {
   const handleRemoveRoute = (routeToRemove) => {
     setAgent({
       ...agent,
-      routes: agent.routes.filter(route => route !== routeToRemove)
+      routes: agent.routes.filter(route => {
+        const routeName = typeof route === 'string' ? route : route.name;
+        return routeName !== routeToRemove;
+      })
     });
   };
 
@@ -349,31 +378,53 @@ export default function AddAgent() {
                     </div>
                   ) : (
                     <div className="alert alert-warning mb-2">
-                      <small>
-                        ⚠️ No routes found in the system. Please add routes from the <strong>Manage Routes</strong> page first.
-                      </small>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <small>
+                          ⚠️ No routes found in the system. Please add routes from the <strong>Manage Routes</strong> page first.
+                        </small>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={addSampleRoutes}
+                        >
+                          ➕ Add Sample Routes
+                        </button>
+                      </div>
                     </div>
                   )}
                   
                   {/* Display added routes */}
                   {agent.routes.length > 0 && (
                     <div className="d-flex flex-wrap gap-2 mt-2">
-                      {agent.routes.map((route, index) => (
-                        <div
-                          key={index}
-                          className="badge bg-primary d-flex align-items-center gap-2 p-2"
-                          style={{ fontSize: '0.9rem' }}
-                        >
-                          <span>📍 {route}</span>
-                          <button
-                            type="button"
-                            className="btn-close btn-close-white"
-                            style={{ fontSize: '0.6rem' }}
-                            onClick={() => handleRemoveRoute(route)}
+                      {agent.routes.map((route, index) => {
+                        // Handle both string and object formats
+                        const routeName = typeof route === 'string' ? route : route.name;
+                        const villages = typeof route === 'object' ? route.villages : [];
+                        
+                        return (
+                          <div
+                            key={index}
+                            className="badge bg-primary d-flex align-items-center gap-2 p-2"
+                            style={{ fontSize: '0.9rem' }}
+                          >
+                            <div>
+                              <div>📍 {routeName}</div>
+                              {villages && villages.length > 0 && (
+                                <small className="d-block mt-1" style={{ fontSize: '0.75rem', opacity: 0.9 }}>
+                                  {villages.join(', ')}
+                                </small>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-close btn-close-white"
+                              style={{ fontSize: '0.6rem' }}
+                            onClick={() => handleRemoveRoute(routeName)}
                             aria-label="Remove route"
                           ></button>
-                        </div>
-                      ))}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   

@@ -198,6 +198,34 @@ export default function Transactions() {
   let totalPenalties = 0;
   let totalBonuses = 0;
   let totalBalance = 0;
+  
+  // Calculate totals for the current view
+  if (viewMode === 'transactions' && selectedCustomerTransactions.length > 0) {
+    selectedCustomerTransactions.forEach(transaction => {
+      if (transaction.type === 'deposit') {
+        totalDeposits += Number(transaction.amount || 0);
+      } else if (transaction.type === 'withdrawal') {
+        totalWithdrawals += Number(transaction.originalAmount || transaction.amount || 0);
+        totalPenalties += Number(transaction.penalty || 0);
+        totalBonuses += Number(transaction.bonusAmount || 0);
+      }
+    });
+    totalBalance = (totalDeposits + totalBonuses) - (totalWithdrawals + totalPenalties);
+  }
+  
+  // Calculate totals for the current view
+  if (viewMode === 'transactions' && selectedCustomerTransactions.length > 0) {
+    selectedCustomerTransactions.forEach(transaction => {
+      if (transaction.type === 'deposit') {
+        totalDeposits += Number(transaction.amount || 0);
+      } else if (transaction.type === 'withdrawal') {
+        totalWithdrawals += Number(transaction.originalAmount || transaction.amount || 0);
+        totalPenalties += Number(transaction.penalty || 0);
+        totalBonuses += Number(transaction.bonusAmount || 0);
+      }
+    });
+    totalBalance = (totalDeposits + totalBonuses) - (totalWithdrawals + totalPenalties);
+  }
 
   if (viewMode === 'customers') {
     // When viewing customers, show total balance from all customers
@@ -271,52 +299,29 @@ export default function Transactions() {
           
           // Calculate penalty if amount exists
           if (newTransaction.amount) {
-            const amount = Number(newTransaction.amount);
-            const monthsCompleted = eligibility.monthsSinceStart;
-            const totalBalance = eligibility.totalDeposits;
-            let penalty = 0;
-            let penaltyApplied = false;
-            
-            if (monthsCompleted < 13) {
-              penalty = Math.floor(amount * 0.05);
-              penaltyApplied = true;
-            }
-            
-            const netAmount = amount - penalty;
-            
-            setWithdrawalPenalty({
-              originalAmount: amount,
-              totalBalance: totalBalance,
-              penalty,
-              netAmount,
-              penaltyApplied,
-              monthsCompleted,
-              reason: penaltyApplied ? `Early withdrawal before 13 months - 5% penalty on withdrawal amount` : 'No penalty - 13 months completed'
-            });
+            await calculateWithdrawalPenalty(Number(newTransaction.amount));
           }
         } catch (error) {
           console.error("Error loading customer eligibility:", error);
         }
       } else if (customerEligibility && newTransaction.amount) {
-        calculateWithdrawalPenalty(Number(newTransaction.amount));
+        await calculateWithdrawalPenalty(Number(newTransaction.amount));
       }
     }
   };
   
-  // Handle amount change for withdrawal
-  const handleAmountChange = (amount) => {
-    setNewTransaction(prev => ({...prev, amount}));
-    
-    // If withdrawal type, calculate penalty
-    if (newTransaction.type === 'withdrawal' && amount && customerEligibility) {
-      calculateWithdrawalPenalty(Number(amount));
-    } else {
-      setWithdrawalPenalty(null);
+  // Handle amount change for withdrawal (now handled inline in JSX)
+  
+  // Force recalculation of withdrawal penalty
+  const forceRecalculateWithdrawal = async () => {
+    if (newTransaction.type === 'withdrawal' && customerEligibility && newTransaction.amount) {
+      setWithdrawalPenalty(null); // Clear cache
+      await calculateWithdrawalPenalty(Number(newTransaction.amount));
     }
   };
   
-  // Calculate withdrawal penalty
-  const calculateWithdrawalPenalty = (amount) => {
+  // Calculate withdrawal penalty with new ₹12,000 bonus logic
+  const calculateWithdrawalPenalty = async (amount) => {
     if (!customerEligibility || !amount) {
       setWithdrawalPenalty(null);
       return;
@@ -324,25 +329,125 @@ export default function Transactions() {
     
     const monthsCompleted = customerEligibility.monthsSinceStart;
     const totalBalance = customerEligibility.totalDeposits;
+    let actualWithdrawalAmount = amount;
     let penalty = 0;
     let penaltyApplied = false;
+    let bonusIncluded = false;
+    let reason = '';
     
-    if (monthsCompleted < 13) {
-      // Penalty is 5% of withdrawal amount
-      penalty = Math.floor(amount * 0.05);
-      penaltyApplied = true;
+    // FIRST: Check date-based penalty/bonus for ALL withdrawals
+    let dateBasedBonus = 0;
+    let dateBasedPenalty = 0;
+    let dateBasedReason = '';
+    
+    try {
+      const { calculateWithdrawalPenalty: calcPenalty } = await import('../utils/databaseHelpers');
+      // Ensure date is in proper YYYY-MM-DD format
+      const withdrawalDate = newTransaction.date || new Date().toISOString().split('T')[0];
+      const penaltyResult = await calcPenalty(amount, monthsCompleted, newTransaction.agentId, newTransaction.customerPhone, withdrawalDate);
+      
+      if (penaltyResult.bonusApplied) {
+        dateBasedBonus = penaltyResult.bonusAmount;
+        dateBasedReason = penaltyResult.reason;
+      } else if (penaltyResult.penaltyApplied) {
+        dateBasedPenalty = penaltyResult.penalty;
+        dateBasedReason = penaltyResult.reason;
+      } else {
+        dateBasedReason = penaltyResult.reason;
+      }
+    } catch (error) {
+      console.error("Error calculating date-based penalty:", error);
+      // For full amount withdrawal before end date, apply 5% penalty as fallback
+      if (amount >= totalBalance) {
+        dateBasedPenalty = Math.floor(amount * 0.05);
+        dateBasedReason = `Early withdrawal - 5% penalty on withdrawal amount`;
+      }
     }
     
-    const netAmount = amount - penalty;
+    // SECOND: Check if customer is withdrawing full amount and bonus eligible
+    if (amount >= totalBalance && customerEligibility.bonusEligible) {
+      // Check 12th month payment status
+      try {
+        const { checkTwelfthMonthPayment } = await import('../utils/databaseHelpers');
+        const twelfthMonth = await checkTwelfthMonthPayment(
+          newTransaction.agentId, 
+          newTransaction.customerPhone, 
+          customerEligibility.startDate
+        );
+        
+        if (!twelfthMonth.hasMissedPayment) {
+          // Customer gets full ₹12,000 deposits + ₹1,000 bonus = ₹13,000 total
+          const standardBonus = 1000;
+          actualWithdrawalAmount = totalBalance + standardBonus + dateBasedBonus;
+          bonusIncluded = true;
+          penalty = dateBasedPenalty; // Apply date-based penalty if any
+          penaltyApplied = dateBasedPenalty > 0;
+          
+          if (dateBasedBonus > 0) {
+            reason = `✅ Full Bonus (₹${standardBonus.toLocaleString()}) + Date Bonus (₹${dateBasedBonus}) - ${dateBasedReason}`;
+          } else if (dateBasedPenalty > 0) {
+            reason = `✅ Full Bonus (₹${standardBonus.toLocaleString()}) but ${dateBasedReason}`;
+          } else {
+            reason = `✅ Full Bonus! 12th month payment on time - Total: ₹${(totalBalance + standardBonus).toLocaleString()}`;
+          }
+        } else {
+          // Customer gets only accumulated amount PLUS/MINUS date-based adjustments
+          actualWithdrawalAmount = totalBalance + dateBasedBonus;
+          penalty = dateBasedPenalty;
+          penaltyApplied = dateBasedPenalty > 0;
+          bonusIncluded = dateBasedBonus > 0;
+          reason = `⚠️ 12th month payment delayed (${twelfthMonth.missedDays} days) - Only accumulated amount: ₹${totalBalance.toLocaleString()}. ${dateBasedReason}`;
+        }
+      } catch (error) {
+        console.error("Error checking 12th month payment:", error);
+        actualWithdrawalAmount = totalBalance + dateBasedBonus;
+        penalty = dateBasedPenalty;
+        penaltyApplied = dateBasedPenalty > 0;
+        bonusIncluded = dateBasedBonus > 0;
+        reason = `Accumulated amount only: ₹${totalBalance.toLocaleString()}. ${dateBasedReason}`;
+      }
+    } else if (amount >= totalBalance && customerEligibility.eligible && !customerEligibility.bonusEligible) {
+      // Customer completed 12 months but not bonus eligible yet - apply date-based logic
+      actualWithdrawalAmount = totalBalance + dateBasedBonus;
+      penalty = dateBasedPenalty;
+      penaltyApplied = dateBasedPenalty > 0;
+      bonusIncluded = dateBasedBonus > 0;
+      reason = `12 months completed - Accumulated amount: ₹${totalBalance.toLocaleString()}. ${dateBasedReason}`;
+    } else {
+      // Partial withdrawal - use date-based calculation
+      if (dateBasedBonus > 0) {
+        actualWithdrawalAmount = amount + dateBasedBonus;
+        bonusIncluded = true;
+        reason = dateBasedReason;
+      } else {
+        penalty = dateBasedPenalty;
+        penaltyApplied = dateBasedPenalty > 0;
+        reason = dateBasedReason;
+      }
+    }
+    
+    const netAmount = actualWithdrawalAmount - penalty;
+    
+    // Calculate Bishi plan dates
+    const startDate = customerEligibility.startDate ? new Date(customerEligibility.startDate) : null;
+    const endDate = startDate ? new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate()) : null;
     
     setWithdrawalPenalty({
       originalAmount: amount,
+      actualWithdrawalAmount: actualWithdrawalAmount,
       totalBalance: totalBalance,
       penalty,
       netAmount,
       penaltyApplied,
-      monthsCompleted,
-      reason: penaltyApplied ? `Early withdrawal before 13 months - 5% penalty on withdrawal amount` : 'No penalty - 13 months completed'
+      bonusIncluded,
+      bonusAmount: bonusIncluded ? (actualWithdrawalAmount - totalBalance) : 0,
+      monthsCompleted: customerEligibility.completedMonths,
+      reason: reason,
+      // Add plan dates
+      planStartDate: startDate ? startDate.toLocaleDateString('en-IN') : null,
+      planEndDate: endDate ? endDate.toLocaleDateString('en-IN') : null,
+      planStartDateISO: customerEligibility.startDate,
+      planEndDateISO: endDate ? endDate.toISOString().split('T')[0] : null
     });
   };
 
@@ -367,19 +472,39 @@ export default function Transactions() {
           return;
         }
         
-        // Confirm withdrawal with penalty details
-        const confirmMessage = `Process withdrawal for ${selectedCustomer?.name}?\n\n` +
+        // Confirm withdrawal with new bonus logic details
+        let confirmMessage = `Process withdrawal for ${selectedCustomer?.name}?\n\n` +
           `Total Balance: ₹${withdrawalPenalty.totalBalance.toLocaleString()}\n` +
-          `Withdrawal Amount: ₹${withdrawalPenalty.originalAmount.toLocaleString()}\n` +
-          `Penalty (5% of withdrawal): ₹${withdrawalPenalty.penalty.toLocaleString()}\n` +
-          `Net Amount to Pay: ₹${withdrawalPenalty.netAmount.toLocaleString()}\n\n` +
-          `Months Completed: ${withdrawalPenalty.monthsCompleted} / 13`;
+          `Requested Amount: ₹${withdrawalPenalty.originalAmount.toLocaleString()}\n`;
+        
+        if (withdrawalPenalty.bonusIncluded) {
+          confirmMessage += `✅ BONUS INCLUDED!\n` +
+            `Total Bonus Amount: ₹${withdrawalPenalty.bonusAmount.toLocaleString()}\n` +
+            `Total Amount: ₹${withdrawalPenalty.actualWithdrawalAmount.toLocaleString()}\n`;
+        } else if (withdrawalPenalty.actualWithdrawalAmount !== withdrawalPenalty.originalAmount) {
+          confirmMessage += `Actual Amount: ₹${withdrawalPenalty.actualWithdrawalAmount.toLocaleString()}\n`;
+        }
+        
+        if (withdrawalPenalty.penaltyApplied) {
+          confirmMessage += `Penalty (5%): ₹${withdrawalPenalty.penalty.toLocaleString()}\n`;
+        }
+        
+        confirmMessage += `Net Amount to Pay: ₹${withdrawalPenalty.netAmount.toLocaleString()}\n\n` +
+          `Months Completed: ${withdrawalPenalty.monthsCompleted} / 12\n` +
+          `Reason: ${withdrawalPenalty.reason}`;
+        
+        // Add plan dates if available
+        if (withdrawalPenalty.planStartDate && withdrawalPenalty.planEndDate) {
+          confirmMessage += `\n\n📅 Bishi Plan Period:\n` +
+            `Start Date: ${withdrawalPenalty.planStartDate}\n` +
+            `End Date: ${withdrawalPenalty.planEndDate}`;
+        }
         
         if (!window.confirm(confirmMessage)) {
           return;
         }
         
-        // Process withdrawal with penalty
+        // Process withdrawal with penalty - this will handle both the withdrawal and transaction creation
         const result = await processEarlyWithdrawal(
           newTransaction.agentId,
           selectedCustomer?.phone,
@@ -395,13 +520,29 @@ export default function Transactions() {
           }
         );
         
-        alert(
-          `Withdrawal processed successfully!\n\n` +
-          `Original Amount: ₹${result.originalAmount.toLocaleString()}\n` +
-          `Penalty: ₹${result.penalty.toLocaleString()}\n` +
-          `Net Amount Paid: ₹${result.netAmount.toLocaleString()}\n` +
-          `Transaction ID: ${result.transactionId}`
-        );
+        if (!result.success) {
+          throw new Error('Failed to process withdrawal');
+        }
+        
+        let successMessage = `Withdrawal processed successfully!\n\n` +
+          `Total Balance: ₹${result.totalBalance?.toLocaleString() || result.originalAmount.toLocaleString()}\n`;
+        
+        if (result.bonusIncluded) {
+          successMessage += `✅ BONUS INCLUDED!\n` +
+            `Bonus Amount: ₹${result.bonusAmount.toLocaleString()}\n` +
+            `Total Amount: ₹${result.actualWithdrawalAmount.toLocaleString()}\n`;
+        } else if (result.actualWithdrawalAmount !== result.originalAmount) {
+          successMessage += `Actual Amount: ₹${result.actualWithdrawalAmount.toLocaleString()}\n`;
+        }
+        
+        if (result.penalty > 0) {
+          successMessage += `Penalty (5%): ₹${result.penalty.toLocaleString()}\n`;
+        }
+        
+        successMessage += `Net Amount Paid: ₹${result.netAmount.toLocaleString()}\n` +
+          `Transaction ID: ${result.transactionId}`;
+        
+        alert(successMessage);
       } else {
         // Handle deposit transaction
         const agentPhone = newTransaction.agentId;  // agentId IS the phone number
@@ -445,8 +586,13 @@ export default function Transactions() {
 
       setShowAddTransaction(false);
       
-      // Reload data
-      loadData();
+      // Reload customer transactions to show the new transaction immediately
+      if (selectedCustomer && selectedAgent) {
+        await handleCustomerClick(selectedCustomer);
+      } else {
+        // Reload all data if not in customer view
+        loadData();
+      }
     } catch (error) {
       alert("Error adding transaction: " + error.message);
     }
@@ -516,8 +662,8 @@ export default function Transactions() {
         console.log("Transactions data:", txns);
         customerTransactions = Object.entries(txns).map(([key, value]) => ({
           id: key,
-          // Support both old and new field names
-          amount: value.amount || value.amountDeposited || 0,
+          // Support both old and new field names, including withdrawal fields
+          amount: value.amount || value.netAmount || value.actualAmount || value.amountDeposited || 0,
           date: value.depositDate || value.date || '',
           time: value.depositTime || value.time || '',
           type: value.type || 'deposit',
@@ -528,12 +674,81 @@ export default function Transactions() {
           customerId: value.customerId || customer.id || 0,
           customerName: customer.name,
           customerPhone: customer.phone,
+          // For withdrawal transactions, include additional fields
+          requestedAmount: value.requestedAmount || 0,
+          actualAmount: value.actualAmount || 0,
+          netAmount: value.netAmount || 0,
+          penalty: value.penalty || 0,
+          bonusAmount: value.bonusAmount || 0,
+          bonusIncluded: value.bonusIncluded || false,
+          penaltyApplied: value.penaltyApplied || false,
           timestamp: value.timestamp || (value.depositDate ? new Date(`${value.depositDate} ${value.depositTime || '00:00:00'}`).getTime() : Date.now()),
           // Keep original data
           ...value
         }));
         
         // Sort by date (newest first)
+        customerTransactions.sort((a, b) => {
+          return b.timestamp - a.timestamp;
+        });
+      }
+      
+      // Also check for withdrawals in the withdrawals/{customerPhone} collection
+      // This collection has the correct bonus amounts, so we'll merge it with agent transactions
+      const withdrawalsRef = ref(db, `withdrawals/${customer.phone}`);
+      const withdrawalsSnapshot = await get(withdrawalsRef);
+      
+      if (withdrawalsSnapshot.exists()) {
+        const withdrawals = withdrawalsSnapshot.val();
+        console.log("Found withdrawals in withdrawals collection:", withdrawals);
+        
+        // Create a map of withdrawal data by date for easy lookup
+        const withdrawalDataMap = new Map();
+        Object.entries(withdrawals).forEach(([key, value]) => {
+          const dateKey = `${value.date || value.withdrawalDate}`;
+          withdrawalDataMap.set(dateKey, {
+            id: key,
+            requestedAmount: value.requestedAmount || 0,
+            actualAmount: value.actualAmount || 0,
+            netAmount: value.netAmount || 0,
+            penalty: value.penalty || 0,
+            bonusAmount: value.bonusAmount || 0,
+            bonusIncluded: value.bonusIncluded || false,
+            penaltyApplied: value.penaltyApplied || false,
+            totalBalance: value.totalBalance || 0,
+            reason: value.reason || '',
+            timestamp: value.timestamp || Date.now()
+          });
+        });
+        
+        // Update existing withdrawal transactions with correct data from withdrawals collection
+        customerTransactions = customerTransactions.map(t => {
+          if (t.type === 'withdrawal') {
+            const dateKey = `${t.date}`;
+            const withdrawalData = withdrawalDataMap.get(dateKey);
+            
+            if (withdrawalData) {
+              // Merge the correct withdrawal data, keeping the receipt number from agent transaction
+              return {
+                ...t,
+                ...withdrawalData,
+                receiptNumber: t.receiptNumber || withdrawalData.receiptNumber || '', // Keep receipt from agent transaction
+                amount: withdrawalData.netAmount || t.amount,
+                requestedAmount: withdrawalData.requestedAmount || t.requestedAmount,
+                actualAmount: withdrawalData.actualAmount || t.actualAmount,
+                netAmount: withdrawalData.netAmount || t.netAmount,
+                penalty: withdrawalData.penalty || t.penalty,
+                bonusAmount: withdrawalData.bonusAmount || t.bonusAmount,
+                bonusIncluded: withdrawalData.bonusIncluded || t.bonusIncluded,
+                penaltyApplied: withdrawalData.penaltyApplied || t.penaltyApplied,
+                totalBalance: withdrawalData.totalBalance || t.totalBalance
+              };
+            }
+          }
+          return t;
+        });
+        
+        // Sort again by date (newest first)
         customerTransactions.sort((a, b) => {
           return b.timestamp - a.timestamp;
         });
@@ -621,20 +836,64 @@ export default function Transactions() {
     console.log("Selected Agent:", selectedAgent);
     console.log("Selected Customer:", selectedCustomer);
     
+    // Validate required data
+    if (!selectedAgent || !selectedAgent.phone) {
+      alert("Error: Agent information is missing. Please refresh and try again.");
+      return;
+    }
+    
+    if (!selectedCustomer || !selectedCustomer.phone) {
+      alert("Error: Customer information is missing. Please refresh and try again.");
+      return;
+    }
+    
+    if (!transaction || !transaction.id) {
+      alert("Error: Transaction ID is missing. Cannot delete transaction.");
+      return;
+    }
+    
     if (window.confirm("Are you sure you want to delete this transaction?")) {
       try {
-        // Delete from Firebase: agents/{agentPhone}/transactions/{customerPhone}/{transactionId}
-        const deletePath = `agents/${selectedAgent.phone}/transactions/${selectedCustomer.phone}/${transaction.id}`;
-        console.log("Deleting from path:", deletePath);
+        let deletedFromMain = false;
+        let deletedFromOld = false;
         
-        const transactionRef = ref(db, deletePath);
-        await remove(transactionRef);
+        // Try to delete from main location: agents/{agentPhone}/transactions/{customerPhone}/{transactionId}
+        try {
+          const deletePath = `agents/${selectedAgent.phone}/transactions/${selectedCustomer.phone}/${transaction.id}`;
+          console.log("Deleting from main path:", deletePath);
+          
+          const transactionRef = ref(db, deletePath);
+          await remove(transactionRef);
+          deletedFromMain = true;
+          console.log("Transaction deleted from main location");
+        } catch (error) {
+          console.log("Transaction not found in main location or error:", error.message);
+        }
         
-        console.log("Transaction deleted successfully");
-        alert("Transaction deleted successfully!");
+        // If it's a withdrawal transaction, also try to delete from old location: withdrawals/{customerPhone}/{transactionId}
+        if (transaction.type === 'withdrawal') {
+          try {
+            const oldWithdrawalPath = `withdrawals/${selectedCustomer.phone}/${transaction.id}`;
+            console.log("Deleting withdrawal from old path:", oldWithdrawalPath);
+            
+            const oldWithdrawalRef = ref(db, oldWithdrawalPath);
+            await remove(oldWithdrawalRef);
+            deletedFromOld = true;
+            console.log("Withdrawal deleted from old location");
+          } catch (error) {
+            console.log("Withdrawal not found in old location or error:", error.message);
+          }
+        }
         
-        // Reload transactions
-        handleCustomerClick(selectedCustomer);
+        if (deletedFromMain || deletedFromOld) {
+          console.log("Transaction deleted successfully");
+          alert("Transaction deleted successfully!");
+          
+          // Reload transactions
+          handleCustomerClick(selectedCustomer);
+        } else {
+          throw new Error("Transaction not found in any location");
+        }
       } catch (error) {
         console.error("Error deleting transaction:", error);
         alert("Error deleting transaction: " + error.message);
@@ -661,7 +920,7 @@ export default function Transactions() {
     printWindow.document.write('.date-time { text-align: right; font-size: 11px; color: #666; margin-top: 5px; }');
     printWindow.document.write('.customer-section { background: #f8f9fa; padding: 20px; border-left: 4px solid #2c5aa0; margin-bottom: 30px; }');
     printWindow.document.write('.customer-section h3 { color: #2c5aa0; font-size: 16px; margin-bottom: 15px; }');
-    printWindow.document.write('.customer-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }');
+    printWindow.document.write('.customer-info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }');
     printWindow.document.write('.info-item { font-size: 13px; }');
     printWindow.document.write('.info-label { color: #666; font-weight: 500; }');
     printWindow.document.write('.info-value { color: #000; font-weight: 600; margin-left: 5px; }');
@@ -710,6 +969,8 @@ export default function Transactions() {
       printWindow.document.write('<div class="info-item"><span class="info-label">Name:</span><span class="info-value">' + selectedCustomer.name + '</span></div>');
       printWindow.document.write('<div class="info-item"><span class="info-label">Phone:</span><span class="info-value">' + selectedCustomer.phone + '</span></div>');
       printWindow.document.write('<div class="info-item"><span class="info-label">Account Number:</span><span class="info-value">' + (selectedCustomer.accountNumber || 'N/A') + '</span></div>');
+      printWindow.document.write('<div class="info-item"><span class="info-label">Agent Name:</span><span class="info-value">' + (selectedAgent?.name || 'N/A') + '</span></div>');
+      printWindow.document.write('<div class="info-item"><span class="info-label">Village:</span><span class="info-value">' + (selectedCustomer.village || selectedCustomer.address || 'N/A') + '</span></div>');
       printWindow.document.write('<div class="info-item"><span class="info-label">Total Balance:</span><span class="balance-highlight">₹' + (totalDeposits - totalWithdrawals).toLocaleString() + '</span></div>');
       printWindow.document.write('</div>');
       printWindow.document.write('</div>');
@@ -810,12 +1071,22 @@ export default function Transactions() {
                 </p>
               </div>
             </div>
-            <button 
-              className="btn btn-light"
-              onClick={() => setShowAddTransaction(true)}
-            >
-              <span className="me-2">➕</span>Add Transaction
-            </button>
+            <div className="d-flex gap-2">
+              {viewMode !== 'agents' && (
+                <button 
+                  className="btn btn-outline-secondary"
+                  onClick={viewMode === 'transactions' ? handleBackToCustomers : handleBackToAgents}
+                >
+                  <span className="me-2">←</span>Back
+                </button>
+              )}
+              <button 
+                className="btn btn-light"
+                onClick={() => setShowAddTransaction(true)}
+              >
+                <span className="me-2">➕</span>Add Transaction
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -978,9 +1249,10 @@ export default function Transactions() {
                               <td>
                                 {agent.routes && agent.routes.length > 0 ? (
                                   <div className="d-flex flex-wrap gap-1">
-                                    {agent.routes.map((route, idx) => (
-                                      <span key={idx} className="badge bg-info">📍 {route}</span>
-                                    ))}
+                                    {agent.routes.map((route, idx) => {
+                                      const routeName = typeof route === 'object' ? route.name : route;
+                                      return <span key={idx} className="badge bg-info">📍 {routeName}</span>;
+                                    })}
                                   </div>
                                 ) : (
                                   <span className="badge bg-secondary">No routes</span>
@@ -1042,7 +1314,23 @@ export default function Transactions() {
                           customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           customer.phone?.includes(searchTerm)
                         )
-                        .map((customer) => (
+                        .map((customer) => {
+                          // Calculate actual balance from transactions
+                          const customerTransactions = transactions.filter(t => 
+                            t.customerPhone === customer.phone || t.customerPhone === customer.phoneNumber
+                          );
+                          
+                          const deposits = customerTransactions
+                            .filter(t => t.type === 'deposit')
+                            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+                          
+                          const withdrawals = customerTransactions
+                            .filter(t => t.type === 'withdrawal')
+                            .reduce((sum, t) => sum + Number(t.netAmount || t.amount || 0), 0);
+                          
+                          const actualBalance = deposits - withdrawals;
+                          
+                          return (
                           <tr key={customer.id} style={{ cursor: 'pointer' }} onClick={() => handleCustomerClick(customer)}>
                             <td>
                               <div className="d-flex align-items-center">
@@ -1057,7 +1345,7 @@ export default function Transactions() {
                               </div>
                             </td>
                             <td>{customer.phoneNumber || customer.phone}</td>
-                            <td className="fw-bold text-success">₹{Number(customer.principalAmount || customer.balance || 0).toLocaleString()}</td>
+                            <td className="fw-bold text-success">₹{actualBalance.toLocaleString()}</td>
                             <td>
                               <span className={`badge ${customer.active ? 'bg-success' : 'bg-danger'}`}>
                                 {customer.active ? 'active' : 'inactive'}
@@ -1069,7 +1357,8 @@ export default function Transactions() {
                               </button>
                             </td>
                           </tr>
-                        ))
+                          );
+                        })
                     )}
                   </tbody>
                 </table>
@@ -1090,19 +1379,27 @@ export default function Transactions() {
               </div>
               <div className="card-body">
                 <div className="row">
-                  <div className="col-md-3">
+                  <div className="col-md-2">
                     <p className="mb-2"><strong>Name:</strong></p>
                     <p className="text-muted">{selectedCustomer.name}</p>
                   </div>
-                  <div className="col-md-3">
+                  <div className="col-md-2">
                     <p className="mb-2"><strong>Phone:</strong></p>
                     <p className="text-muted">{selectedCustomer.phone}</p>
                   </div>
-                  <div className="col-md-3">
+                  <div className="col-md-2">
                     <p className="mb-2"><strong>Account Number:</strong></p>
                     <p className="text-muted">{selectedCustomer.accountNumber || 'N/A'}</p>
                   </div>
-                  <div className="col-md-3">
+                  <div className="col-md-2">
+                    <p className="mb-2"><strong>Agent Name:</strong></p>
+                    <p className="text-muted">{selectedAgent?.name || 'N/A'}</p>
+                  </div>
+                  <div className="col-md-2">
+                    <p className="mb-2"><strong>Village:</strong></p>
+                    <p className="text-muted">{selectedCustomer.village || selectedCustomer.address || 'N/A'}</p>
+                  </div>
+                  <div className="col-md-2">
                     <p className="mb-2"><strong>Balance:</strong></p>
                     <p className="text-success fw-bold">₹{(totalDeposits - totalWithdrawals).toLocaleString()}</p>
                     <small className="text-muted">Deposits: ₹{totalDeposits.toLocaleString()} - Withdrawals: ₹{totalWithdrawals.toLocaleString()}</small>
@@ -1121,19 +1418,20 @@ export default function Transactions() {
                 </div>
               ) : (
                 <div className="table-responsive">
-                <table className="table mb-0">
-                  <thead>
-                    <tr>
-                      <th>Date & Time</th>
-                      <th>Receipt No</th>
-                      <th>Deposit</th>
-                      <th>Withdrawal</th>
-                      <th>Penalty</th>
-                      <th>Net Amount</th>
-                      <th>Mode</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
+                  <table className="table mb-0">
+                    <thead>
+                      <tr>
+                        <th>Date & Time</th>
+                        <th>Receipt No</th>
+                        <th>Deposit</th>
+                        <th>Withdrawal</th>
+                        <th>Bonus</th>
+                        <th>Penalty</th>
+                        <th>Net Amount</th>
+                        <th>Mode</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
                   <tbody>
                     {selectedCustomerTransactions.length === 0 ? (
                       <tr>
@@ -1152,15 +1450,45 @@ export default function Transactions() {
                           // Check if this is a withdrawal by type only
                           const isWithdrawal = transaction.type === 'withdrawal';
                           const depositAmount = transaction.type === 'deposit' ? Number(transaction.amount || 0) : 0;
-                          const originalWithdrawAmount = isWithdrawal ? Number(transaction.originalAmount || transaction.amount || 0) : 0;
+                          const originalWithdrawAmount = isWithdrawal ? Number(transaction.requestedAmount || transaction.originalAmount || transaction.totalBalance || 0) : 0;
                           const penaltyAmount = isWithdrawal ? Number(transaction.penalty || 0) : 0;
-                          const netWithdrawAmount = isWithdrawal ? Number(transaction.amount || 0) : 0;
+                          const netWithdrawAmount = isWithdrawal ? Number(transaction.netAmount || transaction.amount || 0) : 0;
+                          const bonusAmount = isWithdrawal ? Number(transaction.bonusAmount || 0) : 0;
+                          
+                          // Debug logging for withdrawals
+                          if (isWithdrawal) {
+                            console.log('Withdrawal Transaction:', {
+                              id: transaction.id,
+                              bonusAmount: transaction.bonusAmount,
+                              bonusIncluded: transaction.bonusIncluded,
+                              totalBalance: transaction.totalBalance,
+                              netAmount: transaction.netAmount,
+                              actualAmount: transaction.actualAmount
+                            });
+                          }
                           
                           return (
                             <tr key={transaction.id}>
                               <td>
-                                <div className="fw-semibold">{transaction.date ? new Date(transaction.date).toLocaleDateString() : '-'}</div>
-                                {transaction.time && <small className="text-muted">{transaction.time}</small>}
+                                {transaction.type === 'withdrawal' ? (
+                                  <>
+                                    <div className="fw-semibold">
+                                      {transaction.withdrawalDate || transaction.date 
+                                        ? new Date(transaction.withdrawalDate || transaction.date).toLocaleDateString() 
+                                        : '-'}
+                                    </div>
+                                    {transaction.withdrawalTime || transaction.time ? (
+                                      <small className="text-muted">{transaction.withdrawalTime || transaction.time}</small>
+                                    ) : null}
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="fw-semibold">
+                                      {transaction.date ? new Date(transaction.date).toLocaleDateString() : '-'}
+                                    </div>
+                                    {transaction.time && <small className="text-muted">{transaction.time}</small>}
+                                  </>
+                                )}
                               </td>
                               <td>
                                 <span className="badge bg-secondary">{transaction.receiptNumber || '-'}</span>
@@ -1180,6 +1508,13 @@ export default function Transactions() {
                                       <div><small className="text-warning">⚠️ Penalty Applied</small></div>
                                     )}
                                   </div>
+                                ) : (
+                                  <span className="text-muted">-</span>
+                                )}
+                              </td>
+                              <td>
+                                {bonusAmount > 0 ? (
+                                  <span className="fw-bold text-success">+ ₹{bonusAmount.toLocaleString()}</span>
                                 ) : (
                                   <span className="text-muted">-</span>
                                 )}
@@ -1415,7 +1750,16 @@ export default function Transactions() {
                           type="number"
                           className="form-control"
                           value={newTransaction.amount}
-                          onChange={(e) => handleAmountChange(e.target.value)}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setNewTransaction(prev => ({...prev, amount: value}));
+                            // Handle penalty calculation asynchronously without blocking input
+                            if (newTransaction.type === 'withdrawal' && value && customerEligibility) {
+                              calculateWithdrawalPenalty(Number(value));
+                            } else {
+                              setWithdrawalPenalty(null);
+                            }
+                          }}
                           required
                           min="0"
                           step="0.01"
@@ -1452,37 +1796,84 @@ export default function Transactions() {
                     </div>
                   </div>
 
-                  {/* Withdrawal Penalty Display */}
+                  {/* Bonus Eligibility Display - Only for Withdrawal, not for Deposit */}
+
+                  {/* Withdrawal Penalty Display with New Bonus Logic */}
                   {newTransaction.type === 'withdrawal' && withdrawalPenalty && (
-                    <div className={`alert ${withdrawalPenalty.penaltyApplied ? 'alert-warning' : 'alert-success'} mb-4`}>
+                    <div className={`alert ${withdrawalPenalty.bonusIncluded ? 'alert-success' : withdrawalPenalty.penaltyApplied ? 'alert-warning' : 'alert-info'} mb-4`}>
                       <h6 className="alert-heading fw-bold">
-                        {withdrawalPenalty.penaltyApplied ? '⚠️ Penalty Applied' : '✅ No Penalty'}
+                        {withdrawalPenalty.bonusIncluded ? '🎉 Bonus Included!' : 
+                         withdrawalPenalty.penaltyApplied ? '⚠️ Penalty Applied' : 
+                         '✅ No Penalty'}
                       </h6>
                       <div className="row mb-3">
                         <div className="col-md-3">
                           <strong>Total Balance:</strong><br />
-                          <h5 className="mb-0 text-primary">₹{withdrawalPenalty.totalBalance.toLocaleString()}</h5>
+                          <h5 className="mb-0 text-primary">
+                            ₹{withdrawalPenalty.totalBalance.toLocaleString()}
+                            {withdrawalPenalty.bonusIncluded && (
+                              <span className="text-success"> + ₹{withdrawalPenalty.bonusAmount.toLocaleString()} (Bonus)</span>
+                            )}
+                          </h5>
+                          {withdrawalPenalty.bonusIncluded && (
+                            <div className="text-success small">
+                              Total with Bonus: ₹{(withdrawalPenalty.totalBalance + withdrawalPenalty.bonusAmount).toLocaleString()}
+                            </div>
+                          )}
                         </div>
                         <div className="col-md-3">
-                          <strong>Withdrawal Amount:</strong><br />
+                          <strong>Requested Amount:</strong><br />
                           <h5 className="mb-0 text-dark">₹{withdrawalPenalty.originalAmount.toLocaleString()}</h5>
                         </div>
-                        <div className="col-md-3">
-                          <strong>Penalty (5%):</strong><br />
-                          <h5 className="mb-0 text-danger">₹{withdrawalPenalty.penalty.toLocaleString()}</h5>
-                        </div>
+                        {withdrawalPenalty.bonusIncluded && (
+                          <div className="col-md-3">
+                            <strong>🎁 Bonus Amount:</strong><br />
+                            <h5 className="mb-0 text-success">₹{withdrawalPenalty.bonusAmount.toLocaleString()}</h5>
+                          </div>
+                        )}
+                        {withdrawalPenalty.actualWithdrawalAmount !== withdrawalPenalty.originalAmount && !withdrawalPenalty.bonusIncluded && (
+                          <div className="col-md-3">
+                            <strong>Actual Amount:</strong><br />
+                            <h5 className="mb-0 text-warning">₹{withdrawalPenalty.actualWithdrawalAmount.toLocaleString()}</h5>
+                          </div>
+                        )}
+                        {withdrawalPenalty.penaltyApplied && (
+                          <div className="col-md-3">
+                            <strong>Penalty (5%):</strong><br />
+                            <h5 className="mb-0 text-danger">₹{withdrawalPenalty.penalty.toLocaleString()}</h5>
+                          </div>
+                        )}
                         <div className="col-md-3">
                           <strong>Net Amount to Pay:</strong><br />
                           <h5 className="mb-0 text-success fw-bold">₹{withdrawalPenalty.netAmount.toLocaleString()}</h5>
                         </div>
                       </div>
+                      
+                      {withdrawalPenalty.bonusIncluded && (
+                        <div className="alert alert-success mb-3" style={{ fontSize: '0.9rem' }}>
+                          <strong>🎉 Congratulations!</strong> {withdrawalPenalty.reason}
+                        </div>
+                      )}
+                      
                       <div className="alert alert-info mb-0 mt-3" style={{ fontSize: '0.9rem' }}>
-                        <strong>💡 Calculation:</strong> Withdrawal (₹{withdrawalPenalty.originalAmount.toLocaleString()}) - Penalty (₹{withdrawalPenalty.penalty.toLocaleString()}) = Net Amount (₹{withdrawalPenalty.netAmount.toLocaleString()})
+                        <strong>💡 Calculation:</strong> 
+                        {withdrawalPenalty.bonusIncluded ? 
+                          `Requested Amount (₹${withdrawalPenalty.originalAmount.toLocaleString()}) + Bonus (₹${withdrawalPenalty.bonusAmount.toLocaleString()}) = Total Amount (₹${withdrawalPenalty.actualWithdrawalAmount.toLocaleString()})` :
+                          withdrawalPenalty.penaltyApplied ?
+                            `Withdrawal (₹${withdrawalPenalty.originalAmount.toLocaleString()}) - Penalty (₹${withdrawalPenalty.penalty.toLocaleString()}) = Net Amount (₹${withdrawalPenalty.netAmount.toLocaleString()})` :
+                            `Accumulated Amount: ₹${withdrawalPenalty.actualWithdrawalAmount.toLocaleString()}`
+                        }
                       </div>
                       <hr />
                       <small>
                         <strong>Reason:</strong> {withdrawalPenalty.reason}<br />
-                        <strong>Months Completed:</strong> {withdrawalPenalty.monthsCompleted} / 13 months
+                        <strong>Months Completed:</strong> {withdrawalPenalty.monthsCompleted} / 12 months<br />
+                        {withdrawalPenalty.planStartDate && withdrawalPenalty.planEndDate && (
+                          <>
+                            <strong>📅 Bishi Plan Start Date:</strong> {withdrawalPenalty.planStartDate}<br />
+                            <strong>🏁 Bishi Plan End Date:</strong> {withdrawalPenalty.planEndDate}
+                          </>
+                        )}
                       </small>
                     </div>
                   )}
@@ -1523,6 +1914,25 @@ export default function Transactions() {
                   >
                     Cancel
                   </button>
+                  {newTransaction.type === 'withdrawal' && (
+                    <button 
+                      type="button" 
+                      className="btn btn-lg"
+                      onClick={forceRecalculateWithdrawal}
+                      style={{
+                        borderRadius: '12px',
+                        padding: '12px 30px',
+                        background: 'linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%)',
+                        border: 'none',
+                        color: '#2d3436',
+                        fontWeight: '600',
+                        boxShadow: '0 4px 15px rgba(255, 234, 167, 0.4)',
+                        marginRight: '10px'
+                      }}
+                    >
+                      🔄 Recalculate
+                    </button>
+                  )}
                   <button 
                     type="submit" 
                     className="btn btn-lg"

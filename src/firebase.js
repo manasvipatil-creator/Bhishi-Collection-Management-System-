@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
-import { getAnalytics } from "firebase/analytics";
+import { getAnalytics, isSupported } from "firebase/analytics";
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -22,9 +22,27 @@ const app = initializeApp(firebaseConfig);
 // Initialize Realtime Database and get a reference to the service
 export const db = getDatabase(app);
 
-// Initialize Analytics (optional)
-export const analytics = getAnalytics(app);
+// Initialize Analytics only in browser environment and if supported
+let analytics;
 
-// Enable offline persistence for better performance
-// This will cache data locally and sync when online
+if (typeof window !== 'undefined') {
+  isSupported().then(supported => {
+    if (supported) {
+      try {
+        analytics = getAnalytics(app);
+        console.log("Firebase Analytics initialized");
+      } catch (error) {
+        console.warn("Firebase Analytics initialization error:", error);
+      }
+    } else {
+      console.warn("Firebase Analytics not supported in this environment");
+    }
+  }).catch(error => {
+    console.warn("Firebase Analytics check failed:", error);
+  });
+}
+
+export { analytics };
+
+// Log successful Firebase connection
 console.log("Firebase connected successfully to:", firebaseConfig.projectId);

@@ -10,8 +10,22 @@ export default function ViewAgents() {
   const [loading, setLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [routesData, setRoutesData] = useState({});
 
   useEffect(() => {
+    // Load routes data first
+    const routesRef = ref(db, 'routes');
+    onValue(routesRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const routesMap = {};
+        Object.entries(data).forEach(([id, route]) => {
+          routesMap[route.name] = route.villages || [];
+        });
+        setRoutesData(routesMap);
+      }
+    });
+
     const query = ref(db, "agents");
     onValue(query, (snapshot) => {
       const data = snapshot.val();
@@ -32,12 +46,26 @@ export default function ViewAgents() {
           // Calculate commission (assuming 2% of total collections)
           const totalCommission = totalCollections * 0.02;
           
+          // Normalize routes to ensure they're always in the correct format
+          let routes = value.agentInfo?.routes || (value.agentInfo?.route ? [value.agentInfo.route] : []);
+          // Ensure routes is always an array
+          if (!Array.isArray(routes)) {
+            routes = [];
+          }
+          // Convert any route objects to strings (for backward compatibility)
+          routes = routes.map(route => {
+            if (typeof route === 'object' && route !== null) {
+              return route.name || 'Unknown Route';
+            }
+            return route;
+          });
+          
           return {
             id: key,
             agentName: value.agentInfo?.agentName,
             mobileNumber: value.agentInfo?.mobileNumber,
             password: value.agentInfo?.password,
-            routes: value.agentInfo?.routes || (value.agentInfo?.route ? [value.agentInfo.route] : []),
+            routes: routes,
             status: value.agentInfo?.status,
             createdAt: value.agentInfo?.createdAt,
             totalCustomers: totalCustomers,
@@ -57,10 +85,13 @@ export default function ViewAgents() {
     });
   }, []);
 
-  const filteredAgents = agents.filter(agent =>
-    agent.agentName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    agent.routes?.some(route => route.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    agent.mobileNumber?.includes(searchTerm)
+  const filteredAgents = agents.filter(agent => {
+    const searchLower = searchTerm.toLowerCase();
+    const nameMatch = agent.agentName?.toLowerCase().includes(searchLower);
+    const phoneMatch = agent.mobileNumber?.includes(searchTerm);
+    const routeMatch = agent.routes?.some(route => route?.toLowerCase().includes(searchLower));
+    return nameMatch || phoneMatch || routeMatch;
+  }
   );
 
   const totalAgents = filteredAgents.length;
@@ -225,9 +256,20 @@ export default function ViewAgents() {
                         <td>
                           {agent.routes && agent.routes.length > 0 ? (
                             <div className="d-flex flex-wrap gap-1">
-                              {agent.routes.map((route, idx) => (
-                                <span key={idx} className="badge bg-info">📍 {route}</span>
-                              ))}
+                              {agent.routes.map((route, idx) => {
+                                const villages = routesData[route] || [];
+                                
+                                return (
+                                  <span key={idx} className="badge bg-info" title={villages.length > 0 ? villages.join(', ') : ''}>
+                                    📍 {route}
+                                    {villages.length > 0 && (
+                                      <small className="d-block" style={{ fontSize: '0.7rem', opacity: 0.9 }}>
+                                        ({villages.length} villages)
+                                      </small>
+                                    )}
+                                  </span>
+                                );
+                              })}
                             </div>
                           ) : (
                             <span className="badge bg-secondary">No routes</span>
@@ -303,9 +345,20 @@ export default function ViewAgents() {
                         <p><strong>Routes:</strong> 
                           {selectedAgent.routes && selectedAgent.routes.length > 0 ? (
                             <div className="d-flex flex-wrap gap-1 mt-1">
-                              {selectedAgent.routes.map((route, idx) => (
-                                <span key={idx} className="badge bg-info">📍 {route}</span>
-                              ))}
+                              {selectedAgent.routes.map((route, idx) => {
+                                const villages = routesData[route] || [];
+                                
+                                return (
+                                  <div key={idx} className="badge bg-info p-2">
+                                    <div>📍 {route}</div>
+                                    {villages.length > 0 && (
+                                      <small className="d-block mt-1" style={{ fontSize: '0.7rem', opacity: 0.9 }}>
+                                        Villages: {villages.join(', ')}
+                                      </small>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           ) : (
                             <span className="text-muted"> No routes assigned</span>

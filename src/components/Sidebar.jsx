@@ -7,16 +7,17 @@ export default function Sidebar() {
 
   const menuItems = [
     { path: "/", icon: "🏠", label: "Dashboard" },
+     { path: "/manage-routes", icon: "🗺️", label: "Manage Routes" },
     { path: "/add-agent", icon: "👨‍💼", label: "Add Agent" },
     { path: "/view-agents", icon: "👥", label: "View Agents" },
-    { path: "/manage-routes", icon: "🗺️", label: "Manage Routes" },
     { path: "/view-customers", icon: "👥", label: "View Customers" },
     { path: "/transactions", icon: "💳", label: "Transactions" },
-    { path: "/weekly-collections", icon: "📅", label: "Weekly Collections" },
+    { path: "/daily-collections", icon: "📅", label: "Daily Collections" },
+    { path: "/weekly-collections", icon: "📊", label: "Weekly Collections" },
     { path: "/monthly-collections", icon: "📈", label: "Monthly Collections" },
     { path: "/year-end-bonus", icon: "🎁", label: "Year-End Bonus" },
     { path: "/gift-distribution", icon: "🎁", label: "Gift Distribution" },
-    { path: "/reports", icon: "📊", label: "Reports" },
+    { path: "/reports", icon: "📋", label: "Reports" },
   ];
 
   return (

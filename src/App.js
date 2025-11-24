@@ -11,6 +11,7 @@ import ViewAgents from "./pages/ViewAgents";
 import ManageRoutes from "./pages/ManageRoutes";
 
 import ViewCustomers from "./pages/ViewCustomers";
+import DailyCollections from "./pages/DailyCollections";
 import WeeklyCollections from "./pages/WeeklyCollections";
 import MonthlyCollections from "./pages/MonthlyCollections";
 import Transactions from "./pages/Transactions";
@@ -31,6 +32,7 @@ import AgentSequentialManager from "./pages/AgentSequentialManager";
 import SimpleIdConverter from "./pages/SimpleIdConverter";
 import TestFirebaseStructure from "./components/TestFirebaseStructure";
 import SetupAdmin from "./components/SetupAdmin";
+import MigrateAgents from "./pages/MigrateAgents";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./styles/main.css";
 
@@ -57,6 +59,7 @@ function App() {
                       <Route path="/view-agents" element={<ViewAgents />} />
                       <Route path="/manage-routes" element={<ManageRoutes />} />
                       <Route path="/view-customers" element={<ViewCustomers />} />
+                      <Route path="/daily-collections" element={<DailyCollections />} />
                       <Route path="/weekly-collections" element={<WeeklyCollections />} />
                       <Route path="/monthly-collections" element={<MonthlyCollections />} />
                       <Route path="/transactions" element={<Transactions />} />
@@ -70,6 +73,7 @@ function App() {
                       <Route path="/agent-sequential-manager" element={<AgentSequentialManager />} />
                       <Route path="/simple-id-converter" element={<SimpleIdConverter />} />
                       <Route path="/test-firebase-structure" element={<TestFirebaseStructure />} />
+                      <Route path="/migrate-agents" element={<MigrateAgents />} />
                       <Route path="/all-data" element={<AllData />} />
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/print" element={<PrintPage />} />

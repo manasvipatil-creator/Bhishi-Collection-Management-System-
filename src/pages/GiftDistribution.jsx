@@ -14,6 +14,9 @@ export default function GiftDistribution() {
   const [manualSelections, setManualSelections] = useState({});
   const [showManualModal, setShowManualModal] = useState(false);
   const [currentRoute, setCurrentRoute] = useState(null);
+  const [villageData, setVillageData] = useState({});
+  const [showVillageModal, setShowVillageModal] = useState(false);
+  const [selectedRouteForVillages, setSelectedRouteForVillages] = useState(null);
 
   useEffect(() => {
     loadCustomersAndRoutes();
@@ -26,21 +29,42 @@ export default function GiftDistribution() {
       const customers = [];
       const routeMap = {};
 
+      // Load routes with villages from Firebase
+      const routesRef = ref(db, 'routes');
+      const routesSnapshot = await get(routesRef);
+      const routesWithVillages = {};
+      
+      if (routesSnapshot.exists()) {
+        const routesData = routesSnapshot.val();
+        Object.entries(routesData).forEach(([id, route]) => {
+          routesWithVillages[route.name] = route.villages || [];
+        });
+      }
+
       // Collect all customers and organize by routes
       for (const agent of agents) {
         if (agent.customers) {
           const agentRoutes = agent.routes || [];
+          // Normalize routes to strings
+          const normalizedRoutes = agentRoutes.map(r => typeof r === 'object' ? r.name : r);
           
           Object.entries(agent.customers).forEach(([key, customer]) => {
+            // Debug: Log customer data structure to see available fields
+            if (customers.length === 0) {
+              console.log("Sample customer data structure:", customer);
+              console.log("Available fields:", Object.keys(customer));
+            }
+            
             const customerData = {
               id: key,
               customerKey: key,
               customerId: customer.customerId || key,
-              name: customer.name || '',
-              phone: customer.phoneNumber || customer.phone || key,
+              name: customer.name || customer.customerName || '',
+              phone: customer.phoneNumber || customer.phone || customer.mobileNumber || key,
               agentName: agent.name,
               agentPhone: agent.phone,
-              routes: agentRoutes,
+              routes: normalizedRoutes,
+              village: customer.village || customer.address || customer.location || customer.city || 'Unknown Village',
               principalAmount: customer.principalAmount || 0,
               balance: customer.balance || 0,
               status: customer.status || 'active'
@@ -49,7 +73,7 @@ export default function GiftDistribution() {
             customers.push(customerData);
 
             // Add customer to each route
-            agentRoutes.forEach(route => {
+            normalizedRoutes.forEach(route => {
               if (!routeMap[route]) {
                 routeMap[route] = [];
               }
@@ -59,16 +83,54 @@ export default function GiftDistribution() {
         }
       }
 
-      // Convert route map to array
-      const routes = Object.entries(routeMap).map(([routeName, customers]) => ({
-        name: routeName,
-        customers: customers,
-        totalCustomers: customers.length,
-        giftEligibleCount: Math.floor(customers.length / 10)
-      }));
+      // Convert route map to array and organize by villages
+      const routes = Object.entries(routeMap).map(([routeName, customers]) => {
+        const villageMap = {};
+        const routeVillages = routesWithVillages[routeName] || [];
+        
+        // Group customers by village
+        customers.forEach(customer => {
+          const village = customer.village || 'Unknown Village';
+          if (!villageMap[village]) {
+            villageMap[village] = [];
+          }
+          villageMap[village].push(customer);
+        });
+
+        // Add empty villages from route configuration
+        routeVillages.forEach(village => {
+          if (!villageMap[village]) {
+            villageMap[village] = [];
+          }
+        });
+
+        const villageDistribution = Object.entries(villageMap).map(([villageName, villageCustomers]) => ({
+          name: villageName,
+          customers: villageCustomers,
+          totalCustomers: villageCustomers.length,
+          giftEligibleCount: Math.floor(villageCustomers.length / 10)
+        }));
+
+        return {
+          name: routeName,
+          customers: customers,
+          totalCustomers: customers.length,
+          giftEligibleCount: Math.floor(customers.length / 10),
+          villages: villageDistribution,
+          configuredVillages: routeVillages
+        };
+      });
 
       setAllCustomers(customers);
       setRouteData(routes);
+      
+      // Initialize village data for detailed view
+      const initialVillageData = {};
+      routes.forEach(route => {
+        initialVillageData[route.name] = route.villages;
+      });
+      setVillageData(initialVillageData);
+      
     } catch (error) {
       console.error("Error loading customers:", error);
     } finally {
@@ -76,8 +138,9 @@ export default function GiftDistribution() {
     }
   };
 
-  // Filter 250 random customers based on proportional logic
-  // Each click will show DIFFERENT random customers (including manual selection routes)
+  // Filter customers based on VILLAGE-WISE proportional logic
+  // Each village within a route gets gifts based on its customer count
+  // 10 customers = 1 gift, 20 customers = 2 gifts, 30 customers = 3 gifts, etc.
   // NO DUPLICATE CUSTOMERS - using phone number as unique identifier
   const filterCustomers = async () => {
     setFiltering(true); // Start loading animation
@@ -96,82 +159,137 @@ export default function GiftDistribution() {
     const selected = [];
     const selectedPhones = new Set(); // Track phone numbers to avoid duplicates
     const newManualSelections = {};
+    const villageGiftSummary = {}; // Track village-wise gift distribution
 
     routeData.forEach(route => {
-      const eligibleCount = Math.floor(route.customers.length / 10);
+      console.log(`\n🔍 Processing Route: ${route.name}`);
+      villageGiftSummary[route.name] = [];
       
-      if (route.customers.length < 10) {
-        // Routes with less than 10 customers - automatically select random customers
-        // Fisher-Yates shuffle for random selection
-        const customersCopy = [...route.customers];
-        for (let i = customersCopy.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [customersCopy[i], customersCopy[j]] = [customersCopy[j], customersCopy[i]];
-        }
-        
-        // Auto-select random customers from small routes (can select 1 or more based on route size)
-        const autoSelectCount = Math.max(1, Math.floor(route.customers.length / 5)); // Select at least 1
-        const autoSelected = [];
-        
-        for (const customer of customersCopy) {
-          if (autoSelected.length >= autoSelectCount) break;
-          // Only add if phone number not already selected
-          if (!selectedPhones.has(customer.phone)) {
-            autoSelected.push(customer);
-            selectedPhones.add(customer.phone);
+      // Process each village within the route
+      if (route.villages && route.villages.length > 0) {
+        route.villages.forEach(village => {
+          const villageCustomers = village.customers || [];
+          const villageCustomerCount = villageCustomers.length;
+          const villageGiftCount = Math.floor(villageCustomerCount / 10); // 1 gift per 10 customers
+          
+          console.log(`  🏘️ Village: ${village.name} - ${villageCustomerCount} customers - ${villageGiftCount} gifts`);
+          
+          villageGiftSummary[route.name].push({
+            villageName: village.name,
+            totalCustomers: villageCustomerCount,
+            giftsAllocated: villageGiftCount
+          });
+          
+          if (villageCustomerCount < 10 && villageCustomerCount > 0) {
+            // Villages with less than 10 customers - add to manual selection
+            if (!newManualSelections[`${route.name} - ${village.name}`]) {
+              newManualSelections[`${route.name} - ${village.name}`] = {
+                customers: villageCustomers,
+                selected: [] // Will be manually selected
+              };
+            }
+          } else if (villageGiftCount > 0) {
+            // Villages with 10+ customers - automatic gift distribution
+            // Fisher-Yates shuffle for random selection
+            const customersCopy = [...villageCustomers];
+            for (let i = customersCopy.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [customersCopy[i], customersCopy[j]] = [customersCopy[j], customersCopy[i]];
+            }
+            
+            // Select customers from this village, avoiding duplicates
+            const villageSelected = [];
+            for (const customer of customersCopy) {
+              if (villageSelected.length >= villageGiftCount) break;
+              // Only add if phone number not already selected
+              if (!selectedPhones.has(customer.phone)) {
+                villageSelected.push({
+                  ...customer,
+                  selectedFromVillage: village.name,
+                  selectedFromRoute: route.name
+                });
+                selectedPhones.add(customer.phone);
+              }
+            }
+            
+            selected.push(...villageSelected);
+            console.log(`    ✅ Selected ${villageSelected.length} customers from ${village.name}`);
           }
-        }
+        });
+      } else {
+        // Fallback: If no village data, treat entire route as one unit (old logic)
+        const routeCustomerCount = route.customers.length;
+        const routeGiftCount = Math.floor(routeCustomerCount / 10);
         
-        selected.push(...autoSelected);
+        console.log(`  📍 Route (no villages): ${route.name} - ${routeCustomerCount} customers - ${routeGiftCount} gifts`);
         
-        // Also keep for manual selection if admin wants to add more
-        newManualSelections[route.name] = {
-          customers: route.customers,
-          selected: autoSelected // Pre-select the auto-selected ones
-        };
-      } else if (eligibleCount > 0) {
-        // Randomly select customers from this route using Fisher-Yates shuffle
-        // This ensures truly random selection each time
-        const customersCopy = [...route.customers];
-        
-        // Fisher-Yates shuffle algorithm for better randomization
-        for (let i = customersCopy.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [customersCopy[i], customersCopy[j]] = [customersCopy[j], customersCopy[i]];
-        }
-        
-        // Select customers, avoiding duplicates
-        const routeSelected = [];
-        for (const customer of customersCopy) {
-          if (routeSelected.length >= eligibleCount) break;
-          // Only add if phone number not already selected
-          if (!selectedPhones.has(customer.phone)) {
-            routeSelected.push(customer);
-            selectedPhones.add(customer.phone);
+        if (routeCustomerCount < 10) {
+          // Small routes - manual selection
+          newManualSelections[route.name] = {
+            customers: route.customers,
+            selected: []
+          };
+        } else if (routeGiftCount > 0) {
+          // Large routes - automatic selection
+          const customersCopy = [...route.customers];
+          for (let i = customersCopy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [customersCopy[i], customersCopy[j]] = [customersCopy[j], customersCopy[i]];
           }
+          
+          const routeSelected = [];
+          for (const customer of customersCopy) {
+            if (routeSelected.length >= routeGiftCount) break;
+            if (!selectedPhones.has(customer.phone)) {
+              routeSelected.push({
+                ...customer,
+                selectedFromVillage: 'Route Level',
+                selectedFromRoute: route.name
+              });
+              selectedPhones.add(customer.phone);
+            }
+          }
+          
+          selected.push(...routeSelected);
         }
-        
-        selected.push(...routeSelected);
       }
     });
 
-    // Shuffle the final selected array to mix customers from different routes
+    // Shuffle the final selected array to mix customers from different villages/routes
     for (let i = selected.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [selected[i], selected[j]] = [selected[j], selected[i]];
     }
 
-    // Limit to 250 total (should already be unique)
-    const finalSelected = selected.slice(0, 250);
+    // No limit - select all eligible customers based on village-wise logic
+    const finalSelected = selected;
     setSelectedCustomers(finalSelected);
     setManualSelections(newManualSelections);
     setFiltering(false); // Stop loading animation
 
+    // Display village-wise gift distribution summary
+    console.log(`\n🎁 VILLAGE-WISE GIFT DISTRIBUTION SUMMARY:`);
     console.log(`Total selected: ${finalSelected.length}, Unique phones: ${selectedPhones.size}`);
+    
+    Object.entries(villageGiftSummary).forEach(([routeName, villages]) => {
+      console.log(`\n📍 Route: ${routeName}`);
+      villages.forEach(village => {
+        console.log(`  🏘️ ${village.villageName}: ${village.totalCustomers} customers → ${village.giftsAllocated} gifts`);
+      });
+    });
 
+    // Show summary alert
+    let summaryMessage = `🎁 Village-wise Gift Distribution Complete!\n\n`;
+    summaryMessage += `✅ Total Gifts Distributed: ${finalSelected.length}\n`;
+    summaryMessage += `📍 Routes Processed: ${Object.keys(villageGiftSummary).length}\n`;
+    
     if (Object.keys(newManualSelections).length > 0) {
-      alert(`${Object.keys(newManualSelections).length} route(s) have less than 10 customers. Random customers auto-selected. You can manually add more if needed.`);
+      summaryMessage += `\n⚠️ Manual Selection Required:\n`;
+      summaryMessage += `${Object.keys(newManualSelections).length} village(s) have less than 10 customers.\n`;
+      summaryMessage += `Please use manual selection to add customers from these villages.`;
     }
+    
+    alert(summaryMessage);
   };
 
   // Select gold gift winner for each route
@@ -213,6 +331,22 @@ export default function GiftDistribution() {
       return winners[winners.length - 1];
     }
     return null;
+  };
+
+  // Show village-wise distribution for a route
+  const showVillageDistribution = (route) => {
+    setSelectedRouteForVillages(route);
+    setShowVillageModal(true);
+  };
+
+  // Get village statistics for a route
+  const getVillageStats = (route) => {
+    if (!route.villages) return { totalVillages: 0, villagesWithCustomers: 0 };
+    
+    const totalVillages = route.villages.length;
+    const villagesWithCustomers = route.villages.filter(v => v.totalCustomers > 0).length;
+    
+    return { totalVillages, villagesWithCustomers };
   };
 
   // Handle manual selection for routes with < 10 customers
@@ -259,8 +393,8 @@ export default function GiftDistribution() {
     setShowManualModal(false);
   };
 
-  // Save gift distribution to database
-  const saveGiftDistribution = async () => {
+  // Save gift distribution to database and update inventory
+  const saveGiftDistribution = async (giftType = 'regular') => {
     if (selectedCustomers.length === 0) {
       alert("Please filter customers first!");
       return;
@@ -271,13 +405,44 @@ export default function GiftDistribution() {
     }
 
     try {
-      const giftRef = ref(db, `giftDistribution/${new Date().getFullYear()}`);
+      // Save distribution record
+      const distributionId = `dist_${Date.now()}`;
+      const giftRef = ref(db, `giftDistribution/${distributionId}`);
       await set(giftRef, {
+        id: distributionId,
         customers: selectedCustomers,
         goldWinners: goldWinners,
+        giftType: giftType,
+        totalRecipients: selectedCustomers.length,
         date: new Date().toISOString(),
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        year: new Date().getFullYear()
       });
+
+      // Add to gift distribution history
+      const historyId = `history_${Date.now()}`;
+      const historyRef = ref(db, `giftDistributionHistory/${historyId}`);
+      await set(historyRef, {
+        id: historyId,
+        type: 'gift_distribution',
+        giftType: giftType,
+        quantity: selectedCustomers.length,
+        recipients: selectedCustomers.map(c => ({
+          name: c.name,
+          phone: c.phone,
+          agentName: c.agentName,
+          village: c.village
+        })),
+        date: new Date().toISOString(),
+        description: `Distributed ${selectedCustomers.length} ${giftType} gifts to customers`
+      });
+
+      // Update inventory if gift type is specified
+      if (giftType !== 'regular') {
+        // This would integrate with the inventory system
+        // For now, we'll just log it
+        console.log(`Would update inventory for ${giftType} gifts: ${selectedCustomers.length} units`);
+      }
 
       alert("Gift distribution saved successfully!");
     } catch (error) {
@@ -361,7 +526,7 @@ export default function GiftDistribution() {
               disabled={loading}
             >
               <span className="me-2">🎯</span>
-              Filter 250 Customers
+              Village-wise Gift Distribution
             </button>
             
             <button
@@ -401,15 +566,17 @@ export default function GiftDistribution() {
           <h6 className="mb-0">📋 Gift Distribution Rules</h6>
         </div>
         <div className="card-body">
-          <div className="row">
+          {/* Village-wise Distribution Rules */}
+          <div className="row mb-3">
             <div className="col-md-4">
               <div className="p-3 bg-primary bg-opacity-10 rounded mb-3">
-                <h6 className="text-primary mb-2">🎁 Regular Gifts (250 Customers)</h6>
+                <h6 className="text-primary mb-2">🎁 Village-wise Gift Distribution</h6>
                 <ul className="mb-0 small">
-                  <li>Proportional selection based on route size</li>
-                  <li>10 customers = 1 gift</li>
-                  <li>20 customers = 2 gifts</li>
-                  <li>30 customers = 3 gifts (and so on)</li>
+                  <li><strong>Village-based allocation:</strong> Each village gets gifts based on its customer count</li>
+                  <li><strong>10 customers = 1 gift</strong></li>
+                  <li><strong>20 customers = 2 gifts</strong></li>
+                  <li><strong>30 customers = 3 gifts</strong> (and so on)</li>
+                  <li>No customer limit - all eligible customers selected</li>
                 </ul>
               </div>
             </div>
@@ -417,9 +584,10 @@ export default function GiftDistribution() {
               <div className="p-3 bg-warning bg-opacity-10 rounded mb-3">
                 <h6 className="text-warning mb-2">✋ Manual Selection</h6>
                 <ul className="mb-0 small">
-                  <li>Routes with less than 10 customers</li>
+                  <li><strong>Villages with less than 10 customers</strong></li>
                   <li>Admin can manually select multiple customers</li>
                   <li>Added to the filtered list after selection</li>
+                  <li>Ensures fair distribution for small villages</li>
                 </ul>
               </div>
             </div>
@@ -427,12 +595,93 @@ export default function GiftDistribution() {
               <div className="p-3 bg-success bg-opacity-10 rounded mb-3">
                 <h6 className="text-success mb-2">🏆 Gold Gift (One per Route)</h6>
                 <ul className="mb-0 small">
-                  <li>One random customer per route</li>
+                  <li>One random customer per route (not village-based)</li>
                   <li>Different customer on each click</li>
                   <li>No repeats until all customers selected</li>
+                  <li>Independent of village-wise distribution</li>
                 </ul>
               </div>
             </div>
+          </div>
+
+          {/* Village-wise Distribution Rules */}
+          <div className="border-top pt-3">
+            <h6 className="text-info mb-3">🏘️ Village-wise Distribution Rules</h6>
+            <div className="row">
+              <div className="col-md-6">
+                <div className="p-3 bg-info bg-opacity-10 rounded mb-3">
+                  <h6 className="text-info mb-2">📍 Village Distribution Logic</h6>
+                  <ul className="mb-0 small">
+                    <li><strong>Within each route:</strong> Villages get proportional gifts</li>
+                    <li><strong>Village size ≥ 10:</strong> 1 gift per 10 customers</li>
+                    <li><strong>Village size &lt; 10:</strong> Manual selection required</li>
+                    <li><strong>Fair distribution:</strong> Larger villages get more gifts</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="p-3 bg-secondary bg-opacity-10 rounded mb-3">
+                  <h6 className="text-secondary mb-2">🎯 Village Examples</h6>
+                  <ul className="mb-0 small">
+                    <li><strong>Village A (25 customers):</strong> 2 gifts</li>
+                    <li><strong>Village B (15 customers):</strong> 1 gift</li>
+                    <li><strong>Village C (8 customers):</strong> Manual selection</li>
+                    <li><strong>Total route gifts:</strong> Sum of all village gifts</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Village Statistics */}
+            {routeData.length > 0 && (
+              <div className="mt-3">
+                <h6 className="text-success mb-3">📊 Live Village Statistics</h6>
+                <div className="row">
+                  {routeData.slice(0, 3).map((route, index) => (
+                    <div key={index} className="col-md-4">
+                      <div className="p-3 bg-light rounded mb-3 border">
+                        <h6 className="text-dark mb-2">📍 {route.name}</h6>
+                        <div className="small">
+                          <div className="d-flex justify-content-between">
+                            <span>Total Villages:</span>
+                            <strong>{route.villages?.length || 0}</strong>
+                          </div>
+                          <div className="d-flex justify-content-between">
+                            <span>Villages with Customers:</span>
+                            <strong>{route.villages?.filter(v => v.totalCustomers > 0).length || 0}</strong>
+                          </div>
+                          <div className="d-flex justify-content-between">
+                            <span>Total Customers:</span>
+                            <strong>{route.totalCustomers}</strong>
+                          </div>
+                          <div className="d-flex justify-content-between">
+                            <span>Total Gifts:</span>
+                            <strong className="text-success">{route.giftEligibleCount}</strong>
+                          </div>
+                          <hr className="my-2" />
+                          <div className="text-muted">
+                            <strong>Top Villages:</strong>
+                            {route.villages?.slice(0, 2).map((village, vIndex) => (
+                              <div key={vIndex} className="d-flex justify-content-between">
+                                <span className="text-truncate" style={{maxWidth: '120px'}}>{village.name}:</span>
+                                <span>{village.totalCustomers} customers</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {routeData.length > 3 && (
+                  <div className="text-center">
+                    <small className="text-muted">
+                      Showing 3 of {routeData.length} routes. Click "📍 View" in the table below for detailed village breakdown.
+                    </small>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -456,20 +705,36 @@ export default function GiftDistribution() {
                   <tr>
                     <th>Route Name</th>
                     <th>Total Customers</th>
+                    <th>Villages</th>
                     <th>Gift Eligible Count</th>
                     <th>Latest Gold Winner</th>
-                    <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {routeData.map((route, index) => {
                     const goldWinner = getLatestGoldWinner(route.name);
                     const isSmallRoute = route.customers.length < 10;
+                    const villageStats = getVillageStats(route);
 
                     return (
                       <tr key={index} className={isSmallRoute ? 'table-warning' : ''}>
                         <td className="fw-semibold">{route.name}</td>
                         <td>{route.totalCustomers}</td>
+                        <td>
+                          <div className="d-flex align-items-center gap-2">
+                            <span className="badge bg-info">
+                              {villageStats.villagesWithCustomers}/{villageStats.totalVillages} villages
+                            </span>
+                            <button 
+                              className="btn btn-sm btn-outline-primary"
+                              onClick={() => showVillageDistribution(route)}
+                              title="View village details"
+                            >
+                              📍 View
+                            </button>
+                          </div>
+                        </td>
                         <td>
                           {isSmallRoute ? (
                             <span className="badge bg-warning text-dark">
@@ -519,10 +784,12 @@ export default function GiftDistribution() {
               <table className="table mb-0">
                 <thead className="sticky-top bg-light">
                   <tr>
-                    <th>#</th>
+                    <th>Sr no</th>
                     <th>Customer Name</th>
                     <th>Phone</th>
                     <th>Agent</th>
+                    <th>Village</th>
+                    <th>Selected From</th>
                     <th>Routes</th>
                   </tr>
                 </thead>
@@ -533,6 +800,24 @@ export default function GiftDistribution() {
                       <td className="fw-semibold">{customer.name}</td>
                       <td>{customer.phone}</td>
                       <td>{customer.agentName}</td>
+                      <td>
+                        <span className="badge bg-info">
+                          {customer.village || 'Unknown Village'}
+                        </span>
+                      </td>
+                      <td>
+                        {customer.selectedFromVillage ? (
+                          <div>
+                            <span className="badge bg-success mb-1">
+                              🏘️ {customer.selectedFromVillage}
+                            </span>
+                            <br/>
+                            <small className="text-muted">in {customer.selectedFromRoute}</small>
+                          </div>
+                        ) : (
+                          <span className="badge bg-secondary">Route Level</span>
+                        )}
+                      </td>
                       <td>
                         {customer.routes.map((route, i) => (
                           <span key={i} className="badge bg-primary me-1">{route}</span>
@@ -597,6 +882,170 @@ export default function GiftDistribution() {
                 </button>
                 <button className="btn btn-success" onClick={addManualSelections}>
                   Add Selected Customers ({Object.values(manualSelections).reduce((sum, route) => sum + route.selected.length, 0)})
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Village Distribution Modal */}
+      {showVillageModal && selectedRouteForVillages && (
+        <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-xl">
+            <div className="modal-content">
+              <div className="modal-header bg-primary text-white">
+                <h5 className="modal-title">
+                  📍 Village Distribution - {selectedRouteForVillages.name}
+                </h5>
+                <button 
+                  type="button" 
+                  className="btn-close btn-close-white" 
+                  onClick={() => setShowVillageModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="row mb-3">
+                  <div className="col-md-4">
+                    <div className="card bg-info text-white">
+                      <div className="card-body text-center">
+                        <h4>{selectedRouteForVillages.totalCustomers}</h4>
+                        <p className="mb-0">Total Customers</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-md-4">
+                    <div className="card bg-success text-white">
+                      <div className="card-body text-center">
+                        <h4>{selectedRouteForVillages.villages?.length || 0}</h4>
+                        <p className="mb-0">Total Villages</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-md-4">
+                    <div className="card bg-warning text-white">
+                      <div className="card-body text-center">
+                        <h4>{selectedRouteForVillages.giftEligibleCount}</h4>
+                        <p className="mb-0">Gift Eligible</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="table-responsive">
+                  <table className="table table-striped">
+                    <thead>
+                      <tr>
+                        <th>Village Name</th>
+                        <th>Total Customers</th>
+                        <th>Gift Eligible Count</th>
+                        <th>Gift Distribution Logic</th>
+                        <th>Customer Details</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedRouteForVillages.villages?.map((village, index) => (
+                        <tr key={index}>
+                          <td className="fw-semibold">
+                            <span className="me-2">🏘️</span>
+                            {village.name}
+                          </td>
+                          <td>
+                            <span className="badge bg-primary">
+                              {village.totalCustomers}
+                            </span>
+                          </td>
+                          <td>
+                            {village.totalCustomers < 10 ? (
+                              <span className="badge bg-warning text-dark">
+                                Manual Selection
+                              </span>
+                            ) : (
+                              <span className="badge bg-success">
+                                {village.giftEligibleCount} gifts
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="small">
+                              {village.totalCustomers < 10 ? (
+                                <div className="text-warning">
+                                  <strong>Manual Selection Required:</strong><br/>
+                                  • Less than 10 customers<br/>
+                                  • Admin can select multiple customers<br/>
+                                  • Proportional to village size
+                                </div>
+                              ) : (
+                                <div className="text-success">
+                                  <strong>Automatic Selection:</strong><br/>
+                                  • 1 gift per 10 customers<br/>
+                                  • Random selection algorithm<br/>
+                                  • {Math.floor(village.totalCustomers / 10)} gifts allocated
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            {village.customers.length > 0 ? (
+                              <div className="small">
+                                <strong>Sample Customers:</strong><br/>
+                                {village.customers.slice(0, 3).map((customer, idx) => (
+                                  <div key={idx} className="text-muted">
+                                    • {customer.name || 'Unknown'} ({customer.phone})
+                                  </div>
+                                ))}
+                                {village.customers.length > 3 && (
+                                  <div className="text-muted">
+                                    ... and {village.customers.length - 3} more
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-muted">No customers</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Village-wise Gift Distribution Logic Summary */}
+                <div className="card mt-4 border-info">
+                  <div className="card-header bg-info text-white">
+                    <h6 className="mb-0">🎯 Village-wise Gift Distribution Logic</h6>
+                  </div>
+                  <div className="card-body">
+                    <div className="row">
+                      <div className="col-md-6">
+                        <h6 className="text-primary">Automatic Distribution Rules:</h6>
+                        <ul className="small">
+                          <li><strong>10+ customers per village:</strong> 1 gift per 10 customers</li>
+                          <li><strong>Random selection:</strong> Fisher-Yates shuffle algorithm</li>
+                          <li><strong>No duplicates:</strong> Phone number based uniqueness</li>
+                          <li><strong>Proportional allocation:</strong> Larger villages get more gifts</li>
+                        </ul>
+                      </div>
+                      <div className="col-md-6">
+                        <h6 className="text-warning">Manual Selection Rules:</h6>
+                        <ul className="small">
+                          <li><strong>&lt;10 customers per village:</strong> Manual selection required</li>
+                          <li><strong>Admin control:</strong> Can select multiple customers</li>
+                          <li><strong>Flexible allocation:</strong> Based on village importance</li>
+                          <li><strong>Minimum guarantee:</strong> At least 1 customer per small village</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => setShowVillageModal(false)}
+                >
+                  Close
                 </button>
               </div>
             </div>

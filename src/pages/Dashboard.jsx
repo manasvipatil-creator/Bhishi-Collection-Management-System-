@@ -113,56 +113,39 @@ export default function Dashboard() {
       title: "Total Agents",
       value: stats.totalAgents,
       icon: "👨‍💼",
-      gradient: "var(--primary-gradient)",
-      change: "+5%",
-      changeType: "positive"
+      color: "#007bff"
     },
     {
       title: "Total Customers",
       value: stats.totalCustomers,
       icon: "👥",
-      gradient: "var(--success-gradient)",
-      change: "+12%",
-      changeType: "positive"
+      color: "#28a745"
     },
     {
-      title: "Total Submitted",
+      title: "Total Amount",
       value: `₹${stats.totalAmount.toLocaleString()}`,
       icon: "💰",
-      gradient: "var(--warning-gradient)",
-      change: "+15%",
-      changeType: "positive"
+      color: "#ffc107"
     },
     {
-      title: "Weekly Collections",
+      title: "Total Collections",
       value: stats.totalCollections,
       icon: "📅",
-      gradient: "var(--secondary-gradient)",
-      change: "+8%",
-      changeType: "positive"
+      color: "#6f42c1"
     }
   ];
 
   // Removed Total Penalties and Total Bonuses cards
 
   return (
-    <div className="container-fluid fade-in-up">
+    <div className="container-fluid">
       {/* Welcome Section */}
       <div className="row mb-4">
         <div className="col-12">
-          <div className="card border-0" style={{ background: 'var(--primary-gradient)', color: 'white' }}>
-            <div className="card-body p-4">
-              <div className="row align-items-center">
-                <div className="col-md-8">
-                  <h2 className="mb-2 fw-bold">Welcome to Bishi Collection Dashboard</h2>
-                  <p className="mb-0 opacity-75">
-                    Manage your collection business efficiently with our comprehensive management system.
-                  </p>
-                </div>
-                <div className="col-md-4 text-end">
-                  <div style={{ fontSize: '4rem', opacity: 0.3 }}>💎</div>
-                </div>
-              </div>
+          <div className="card">
+            <div className="card-body">
+              <h3 className="mb-2">Bishi Collection Dashboard</h3>
+              <p className="text-muted mb-0">Manage your collection business efficiently</p>
             </div>
           </div>
         </div>
@@ -172,29 +155,27 @@ export default function Dashboard() {
       <div className="row mb-4">
         {statsCards.map((stat, index) => (
           <div key={index} className="col-lg-3 col-md-6 mb-3">
-            <div className="stats-card">
-              <div className="d-flex justify-content-between align-items-start mb-3">
-                <div className="stats-icon" style={{ background: stat.gradient }}>
-                  {stat.icon}
+            <div className="card">
+              <div className="card-body text-center">
+                <div className="mb-3">
+                  <span style={{ fontSize: '2rem', color: stat.color }}>
+                    {stat.icon}
+                  </span>
                 </div>
-                <span className={`badge ${stat.changeType === 'positive' ? 'bg-success' : 'bg-danger'}`}>
-                  {stat.change}
-                </span>
+                <h4 className="mb-2">{stat.value}</h4>
+                <p className="text-muted mb-0">{stat.title}</p>
               </div>
-              <h3 className="stats-number">{stat.value}</h3>
-              <p className="stats-label">{stat.title}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Recent Activity & System Status */}
+      {/* Recent Transactions */}
       <div className="row">
-        {/* Recent Activity */}
-        <div className="col-lg-8">
+        <div className="col-12">
           <div className="card">
             <div className="card-header">
-              <h6 className="mb-0">Recent Transactions</h6>
+              <h5 className="mb-0">Recent Transactions</h5>
             </div>
             <div className="card-body">
               {recentTransactions.length === 0 ? (
@@ -202,50 +183,36 @@ export default function Dashboard() {
                   <p>No recent transactions</p>
                 </div>
               ) : (
-                recentTransactions.map((transaction, index) => {
-                  const getTransactionIcon = (type) => {
-                    switch (type) {
-                      case 'deposit': return '💰';
-                      case 'withdrawal': return '💸';
-                      case 'penalty': return '⚠️';
-                      case 'bonus': return '🎁';
-                      default: return '📝';
-                    }
-                  };
-
-                  const getTransactionGradient = (type) => {
-                    switch (type) {
-                      case 'deposit': return 'var(--success-gradient)';
-                      case 'withdrawal': return 'var(--danger-color)';
-                      case 'penalty': return 'var(--warning-gradient)';
-                      case 'bonus': return 'var(--primary-gradient)';
-                      default: return 'var(--secondary-gradient)';
-                    }
-                  };
-
-                  return (
-                    <div key={index} className={`d-flex align-items-center ${index < recentTransactions.length - 1 ? 'mb-3' : ''} p-3 rounded`}
-                      style={{ background: 'var(--bg-primary)' }}>
-                      <div className="me-3">
-                        <div className="rounded-circle d-flex align-items-center justify-content-center"
-                          style={{ width: '40px', height: '40px', background: getTransactionGradient(transaction.type) }}>
-                          <span style={{ fontSize: '1rem' }}>{getTransactionIcon(transaction.type)}</span>
-                        </div>
-                      </div>
-                      <div className="flex-grow-1">
-                        <h6 className="mb-1">{transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)} - ₹{Number(transaction.amount).toLocaleString()}</h6>
-                        <small className="text-muted">{transaction.customerName} (Agent: {transaction.agentName})</small>
-                      </div>
-                      <small className="text-muted">{new Date(transaction.date).toLocaleDateString()}</small>
-                    </div>
-                  );
-                })
+                <div className="table-responsive">
+                  <table className="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Agent</th>
+                        <th>Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentTransactions.map((transaction, index) => (
+                        <tr key={index}>
+                          <td>
+                            <span className="badge bg-secondary">
+                              {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+                            </span>
+                          </td>
+                          <td>₹{Number(transaction.amount).toLocaleString()}</td>
+                          <td>{transaction.agentName}</td>
+                          <td>{new Date(transaction.date).toLocaleDateString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
         </div>
-
-       
       </div>
     </div>
   );

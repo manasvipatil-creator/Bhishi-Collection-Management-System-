@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { ref, push } from "firebase/database";
+import { ref, push, get } from "firebase/database";
 import { db } from "../firebase";
+import { sendDepositNotification } from "../utils/whatsappNotification";
 
 export default function AddCollection() {
   const [data, setData] = useState({
@@ -35,6 +36,50 @@ export default function AddCollection() {
         status: 'completed',
         createdAt: new Date().toISOString()
       });
+
+      // Try to send WhatsApp notification
+      try {
+        // Try to get customer details from database
+        const customersRef = ref(db, 'agents');
+        const agentsSnapshot = await get(customersRef);
+        
+        let customerData = null;
+        let agentName = 'Agent';
+        let totalAmount = Number(data.amountDeposited);
+        
+        if (agentsSnapshot.exists()) {
+          const agents = agentsSnapshot.val();
+          
+          // Search for customer by ID across all agents
+          for (const [agentPhone, agentData] of Object.entries(agents)) {
+            if (agentData.customers) {
+              for (const [customerKey, customer] of Object.entries(agentData.customers)) {
+                if (customer.customerId === data.customerId || customer.phone === data.customerId) {
+                  customerData = customer;
+                  agentName = agentData.agentInfo?.agentName || 'Agent';
+                  totalAmount = (customer.totalDeposits || 0) + Number(data.amountDeposited);
+                  break;
+                }
+              }
+            }
+            if (customerData) break;
+          }
+        }
+        
+        // Send notification if we have customer phone
+        if (customerData && customerData.phone) {
+          await sendDepositNotification({
+            customerPhone: customerData.phone,
+            customerName: customerData.name || 'Customer',
+            amount: Number(data.amountDeposited),
+            accountNumber: customerData.accountNumber || data.customerId,
+            totalAmount: totalAmount,
+            agentName: agentName
+          });
+        }
+      } catch (notifError) {
+        console.error("WhatsApp notification failed (non-critical):", notifError);
+      }
 
       // Reset form
       setData({

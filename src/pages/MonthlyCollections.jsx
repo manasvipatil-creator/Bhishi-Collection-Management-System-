@@ -201,32 +201,24 @@ export default function MonthlyCollections() {
     
     printWindow.document.write('<html><head><title>Monthly Collections Report</title>');
     printWindow.document.write('<style>');
-    printWindow.document.write('@page { margin: 10mm 15mm; }');
+    printWindow.document.write('@page { margin: 10mm; size: A4; }');
     printWindow.document.write('* { margin: 0; padding: 0; box-sizing: border-box; }');
-    printWindow.document.write('body { font-family: "Segoe UI", Arial, sans-serif; padding: 0; background: white; color: #333; margin: 0; }');
+    printWindow.document.write('body { font-family: "Segoe UI", Arial, sans-serif; padding: 0; background: white; color: #333; margin: 0; font-size: 12px; }');
     printWindow.document.write('.report-container { background: white; padding: 0; max-width: 100%; margin: 0; }');
-    printWindow.document.write('.header { border-bottom: 3px solid #2c5aa0; padding-bottom: 15px; margin-bottom: 20px; text-align: center; margin-top: 0; }');
-    printWindow.document.write('.company-name { font-size: 28px; font-weight: bold; color: #2c5aa0; margin-bottom: 10px; }');
-    printWindow.document.write('.report-title { font-size: 20px; color: #2c5aa0; margin-bottom: 10px; }');
-    printWindow.document.write('.report-period { font-size: 16px; color: #666; margin-bottom: 5px; }');
-    printWindow.document.write('.generation-info { font-size: 12px; color: #888; }');
-    printWindow.document.write('.summary-section { background: #f8f9fa; padding: 15px; border-left: 4px solid #2c5aa0; margin-bottom: 20px; }');
-    printWindow.document.write('.summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 15px; }');
-    printWindow.document.write('.summary-item { text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }');
-    printWindow.document.write('.summary-label { font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }');
-    printWindow.document.write('.summary-value { font-size: 20px; font-weight: bold; }');
-    printWindow.document.write('.summary-deposits { color: #10b981; }');
-    printWindow.document.write('.summary-withdrawals { color: #ef4444; }');
-    printWindow.document.write('.summary-net { color: #2c5aa0; }');
-    printWindow.document.write('.agent-section { margin-bottom: 40px; page-break-inside: avoid; }');
-    printWindow.document.write('.agent-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; border-radius: 8px 8px 0 0; }');
-    printWindow.document.write('.agent-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }');
-    printWindow.document.write('.agent-info { font-size: 13px; opacity: 0.9; }');
-    printWindow.document.write('table { width: 100%; border-collapse: collapse; margin-top: 0; font-size: 13px; }');
+    printWindow.document.write('.header { border-bottom: 2px solid #2c5aa0; padding: 10px 0; margin-bottom: 15px; text-align: center; }');
+    printWindow.document.write('.company-name { font-size: 22px; font-weight: bold; color: #2c5aa0; margin-bottom: 5px; }');
+    printWindow.document.write('.report-title { font-size: 16px; color: #2c5aa0; margin-bottom: 5px; }');
+    printWindow.document.write('.report-period { font-size: 13px; color: #666; margin-bottom: 3px; }');
+    printWindow.document.write('.generation-info { font-size: 10px; color: #888; }');
+    printWindow.document.write('.agent-section { margin-bottom: 20px; page-break-inside: avoid; margin-top: 0; }');
+    printWindow.document.write('.agent-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 10px 15px; border-radius: 5px 5px 0 0; }');
+    printWindow.document.write('.agent-name { font-size: 14px; font-weight: bold; margin-bottom: 3px; }');
+    printWindow.document.write('.agent-info { font-size: 11px; opacity: 0.9; }');
+    printWindow.document.write('table { width: 100%; border-collapse: collapse; margin-top: 0; font-size: 11px; }');
     printWindow.document.write('thead { background: #f8f9fa; }');
-    printWindow.document.write('th { padding: 12px 10px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid #e0e0e0; }');
+    printWindow.document.write('th { padding: 8px 6px; text-align: left; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; border: 1px solid #e0e0e0; }');
     printWindow.document.write('tbody tr { border-bottom: 1px solid #e0e0e0; }');
-    printWindow.document.write('td { padding: 10px; border: 1px solid #e0e0e0; }');
+    printWindow.document.write('td { padding: 6px; border: 1px solid #e0e0e0; font-size: 10px; }');
     printWindow.document.write('.date-col { width: 100px; }');
     printWindow.document.write('.customer-col { width: 200px; }');
     printWindow.document.write('.amount-col { width: 100px; text-align: right; font-weight: 600; }');
@@ -234,11 +226,11 @@ export default function MonthlyCollections() {
     printWindow.document.write('.text-success { color: #10b981; }');
     printWindow.document.write('.text-danger { color: #ef4444; }');
     printWindow.document.write('.subtotal-row { background: #f8f9fa; font-weight: bold; }');
-    printWindow.document.write('.grand-total { margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 2px solid #2c5aa0; }');
-    printWindow.document.write('.grand-total-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }');
-    printWindow.document.write('.total-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #ddd; }');
-    printWindow.document.write('.total-item:last-child { border-bottom: 2px solid #2c5aa0; font-size: 18px; font-weight: bold; }');
-    printWindow.document.write('.footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e0e0e0; text-align: center; font-size: 11px; color: #888; }');
+    printWindow.document.write('.grand-total { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border: 2px solid #2c5aa0; }');
+    printWindow.document.write('.grand-total-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }');
+    printWindow.document.write('.total-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #ddd; font-size: 12px; }');
+    printWindow.document.write('.total-item:last-child { border-bottom: 2px solid #2c5aa0; font-size: 14px; font-weight: bold; }');
+    printWindow.document.write('.footer { margin-top: 20px; padding-top: 15px; border-top: 1px solid #e0e0e0; text-align: center; font-size: 9px; color: #888; }');
     printWindow.document.write('@media print { body { background: white !important; padding: 0 !important; margin: 0 !important; } .report-container { box-shadow: none !important; padding: 0 !important; margin: 0 !important; } }');
     printWindow.document.write('</style>');
     printWindow.document.write('</head><body>');
@@ -256,25 +248,6 @@ export default function MonthlyCollections() {
     }
     printWindow.document.write('</div>');
     printWindow.document.write('<div class="generation-info">Generated on: ' + currentDate + ' at ' + currentTime + '</div>');
-    printWindow.document.write('</div>');
-    
-    // Summary Section
-    printWindow.document.write('<div class="summary-section">');
-    printWindow.document.write('<h3 style="color: #2c5aa0; margin-bottom: 15px;">📊 Summary</h3>');
-    printWindow.document.write('<div class="summary-grid">');
-    printWindow.document.write('<div class="summary-item">');
-    printWindow.document.write('<div class="summary-label">Total Deposits</div>');
-    printWindow.document.write('<div class="summary-value summary-deposits">₹' + stats.totalDeposits.toLocaleString() + '</div>');
-    printWindow.document.write('</div>');
-    printWindow.document.write('<div class="summary-item">');
-    printWindow.document.write('<div class="summary-label">Total Withdrawals</div>');
-    printWindow.document.write('<div class="summary-value summary-withdrawals">₹' + stats.totalWithdrawals.toLocaleString() + '</div>');
-    printWindow.document.write('</div>');
-    printWindow.document.write('<div class="summary-item">');
-    printWindow.document.write('<div class="summary-label">Net Amount</div>');
-    printWindow.document.write('<div class="summary-value summary-net">₹' + stats.totalAmount.toLocaleString() + '</div>');
-    printWindow.document.write('</div>');
-    printWindow.document.write('</div>');
     printWindow.document.write('</div>');
     
     // Agent-wise transactions
@@ -325,7 +298,7 @@ export default function MonthlyCollections() {
     
     // Grand Total
     printWindow.document.write('<div class="grand-total">');
-    printWindow.document.write('<h3 style="color: #2c5aa0; margin-bottom: 20px; text-align: center;">📋 Grand Total</h3>');
+    printWindow.document.write('<h3 style="color: #2c5aa0; margin: 0 0 12px 0; text-align: center; font-size: 14px;">📋 Grand Total</h3>');
     printWindow.document.write('<div class="total-item">');
     printWindow.document.write('<span>Total Deposits:</span>');
     printWindow.document.write('<span class="text-success">₹' + stats.totalDeposits.toLocaleString() + '</span>');
