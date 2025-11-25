@@ -7,6 +7,7 @@ export default function GiftDistribution() {
   const [allCustomers, setAllCustomers] = useState([]);
   const [routeData, setRouteData] = useState([]);
   const [selectedCustomers, setSelectedCustomers] = useState([]);
+  const [manuallySelectedCustomers, setManuallySelectedCustomers] = useState([]); // Separate state for manually selected
   const [goldWinners, setGoldWinners] = useState({});
   const [loading, setLoading] = useState(true);
   const [filtering, setFiltering] = useState(false); // Loading state for filter button
@@ -292,7 +293,7 @@ export default function GiftDistribution() {
     alert(summaryMessage);
   };
 
-  // Select gold gift winner for each route
+  // Select gold gift winner for each route (from any village in that route)
   const selectGoldWinners = () => {
     const winners = {};
     
@@ -301,22 +302,37 @@ export default function GiftDistribution() {
         // Get previously selected winners for this route
         const previousWinners = goldWinners[route.name] || [];
         
+        // Get all customers from all villages in this route
+        let allRouteCustomers = [];
+        
+        if (route.villages && route.villages.length > 0) {
+          // Collect customers from all villages
+          route.villages.forEach(village => {
+            if (village.customers && village.customers.length > 0) {
+              allRouteCustomers = [...allRouteCustomers, ...village.customers];
+            }
+          });
+        } else {
+          // Fallback: use route.customers if no village data
+          allRouteCustomers = route.customers;
+        }
+        
         // Filter out previously selected winners
-        const availableCustomers = route.customers.filter(
+        const availableCustomers = allRouteCustomers.filter(
           c => !previousWinners.some(w => w.phone === c.phone)
         );
 
         if (availableCustomers.length > 0) {
-          // Randomly select one customer
+          // Randomly select one customer from any village in this route
           const randomIndex = Math.floor(Math.random() * availableCustomers.length);
           const winner = availableCustomers[randomIndex];
           
           // Add to previous winners list
           winners[route.name] = [...previousWinners, winner];
         } else {
-          // All customers have been selected, reset
-          const randomIndex = Math.floor(Math.random() * route.customers.length);
-          winners[route.name] = [route.customers[randomIndex]];
+          // All customers have been selected, reset and select from all customers
+          const randomIndex = Math.floor(Math.random() * allRouteCustomers.length);
+          winners[route.name] = [allRouteCustomers[randomIndex]];
         }
       }
     });
@@ -367,25 +383,28 @@ export default function GiftDistribution() {
     });
   };
 
-  // Add manually selected customers to main selection
-  // Only add customers that are NOT already in the selected list
+  // Add manually selected customers to separate list
+  // Keep them separate from auto-selected customers
   const addManualSelections = () => {
     const manuallySelected = [];
-    const existingPhones = new Set(selectedCustomers.map(c => c.phone));
+    const existingPhones = new Set(manuallySelectedCustomers.map(c => c.phone));
     
     Object.values(manualSelections).forEach(route => {
       route.selected.forEach(customer => {
-        // Only add if not already in the list
+        // Only add if not already in the manually selected list
         if (!existingPhones.has(customer.phone)) {
-          manuallySelected.push(customer);
+          manuallySelected.push({
+            ...customer,
+            selectionType: 'manual' // Mark as manually selected
+          });
           existingPhones.add(customer.phone);
         }
       });
     });
 
     if (manuallySelected.length > 0) {
-      setSelectedCustomers(prev => [...prev, ...manuallySelected]);
-      alert(`Added ${manuallySelected.length} additional manually selected customers to the gift list.`);
+      setManuallySelectedCustomers(prev => [...prev, ...manuallySelected]);
+      alert(`Added ${manuallySelected.length} manually selected customers to the separate list.`);
     } else {
       alert('All selected customers are already in the list.');
     }
@@ -395,25 +414,37 @@ export default function GiftDistribution() {
 
   // Save gift distribution to database and update inventory
   const saveGiftDistribution = async (giftType = 'regular') => {
-    if (selectedCustomers.length === 0) {
+    const totalCustomers = selectedCustomers.length + manuallySelectedCustomers.length;
+    
+    if (totalCustomers === 0) {
       alert("Please filter customers first!");
       return;
     }
 
-    if (!window.confirm(`Save gift distribution for ${selectedCustomers.length} customers?`)) {
+    if (!window.confirm(`Save gift distribution for ${totalCustomers} customers?\n\nAuto-selected: ${selectedCustomers.length}\nManually selected: ${manuallySelectedCustomers.length}`)) {
       return;
     }
 
     try {
+      // Combine both auto and manually selected customers
+      const allCustomers = [
+        ...selectedCustomers.map(c => ({ ...c, selectionType: 'auto' })),
+        ...manuallySelectedCustomers.map(c => ({ ...c, selectionType: 'manual' }))
+      ];
+
       // Save distribution record
       const distributionId = `dist_${Date.now()}`;
       const giftRef = ref(db, `giftDistribution/${distributionId}`);
       await set(giftRef, {
         id: distributionId,
-        customers: selectedCustomers,
+        autoSelectedCustomers: selectedCustomers,
+        manuallySelectedCustomers: manuallySelectedCustomers,
+        allCustomers: allCustomers,
         goldWinners: goldWinners,
         giftType: giftType,
-        totalRecipients: selectedCustomers.length,
+        totalRecipients: totalCustomers,
+        autoSelectedCount: selectedCustomers.length,
+        manuallySelectedCount: manuallySelectedCustomers.length,
         date: new Date().toISOString(),
         timestamp: Date.now(),
         year: new Date().getFullYear()
@@ -426,32 +457,34 @@ export default function GiftDistribution() {
         id: historyId,
         type: 'gift_distribution',
         giftType: giftType,
-        quantity: selectedCustomers.length,
-        recipients: selectedCustomers.map(c => ({
+        quantity: totalCustomers,
+        autoSelectedCount: selectedCustomers.length,
+        manuallySelectedCount: manuallySelectedCustomers.length,
+        recipients: allCustomers.map(c => ({
           name: c.name,
           phone: c.phone,
           agentName: c.agentName,
-          village: c.village
+          village: c.village,
+          selectionType: c.selectionType
         })),
         date: new Date().toISOString(),
-        description: `Distributed ${selectedCustomers.length} ${giftType} gifts to customers`
+        description: `Distributed ${totalCustomers} ${giftType} gifts (${selectedCustomers.length} auto + ${manuallySelectedCustomers.length} manual)`
       });
 
       // Update inventory if gift type is specified
       if (giftType !== 'regular') {
         // This would integrate with the inventory system
         // For now, we'll just log it
-        console.log(`Would update inventory for ${giftType} gifts: ${selectedCustomers.length} units`);
+        console.log(`Would update inventory for ${giftType} gifts: ${totalCustomers} units`);
       }
 
-      alert("Gift distribution saved successfully!");
+      alert(`Gift distribution saved successfully!\n\nTotal: ${totalCustomers} customers\nAuto-selected: ${selectedCustomers.length}\nManually selected: ${manuallySelectedCustomers.length}`);
     } catch (error) {
       alert("Error saving gift distribution: " + error.message);
     }
   };
 
-  const totalGiftRecipients = selectedCustomers.length + 
-    Object.values(manualSelections).reduce((sum, route) => sum + route.selected.length, 0);
+  const totalGiftRecipients = selectedCustomers.length + manuallySelectedCustomers.length;
 
   return (
     <div className="container-fluid fade-in-up">
@@ -708,7 +741,6 @@ export default function GiftDistribution() {
                     <th>Villages</th>
                     <th>Gift Eligible Count</th>
                     <th>Latest Gold Winner</th>
-                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -754,13 +786,6 @@ export default function GiftDistribution() {
                             </div>
                           ) : (
                             <span className="text-muted">Not selected yet</span>
-                          )}
-                        </td>
-                        <td>
-                          {isSmallRoute && (
-                            <span className="badge bg-warning">
-                              &lt; 10 customers
-                            </span>
                           )}
                         </td>
                       </tr>
@@ -822,6 +847,76 @@ export default function GiftDistribution() {
                         {customer.routes.map((route, i) => (
                           <span key={i} className="badge bg-primary me-1">{route}</span>
                         ))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manually Selected Customers - Separate Display */}
+      {manuallySelectedCustomers.length > 0 && (
+        <div className="card mb-4">
+          <div className="card-header bg-warning text-dark">
+            <div className="d-flex justify-content-between align-items-center">
+              <h6 className="mb-0">✋ Manually Selected Customers ({manuallySelectedCustomers.length})</h6>
+              <button 
+                className="btn btn-sm btn-danger"
+                onClick={() => {
+                  if (window.confirm('Clear all manually selected customers?')) {
+                    setManuallySelectedCustomers([]);
+                  }
+                }}
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+          <div className="card-body p-0">
+            <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <table className="table mb-0">
+                <thead className="sticky-top bg-light">
+                  <tr>
+                    <th>Sr no</th>
+                    <th>Customer Name</th>
+                    <th>Phone</th>
+                    <th>Agent</th>
+                    <th>Village</th>
+                    <th>Routes</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {manuallySelectedCustomers.map((customer, index) => (
+                    <tr key={index}>
+                      <td>{index + 1}</td>
+                      <td className="fw-semibold">{customer.name}</td>
+                      <td>{customer.phone}</td>
+                      <td>{customer.agentName}</td>
+                      <td>
+                        <span className="badge bg-info">
+                          {customer.village || 'Unknown Village'}
+                        </span>
+                      </td>
+                      <td>
+                        {customer.routes.map((route, i) => (
+                          <span key={i} className="badge bg-primary me-1">{route}</span>
+                        ))}
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => {
+                            setManuallySelectedCustomers(prev => 
+                              prev.filter(c => c.phone !== customer.phone)
+                            );
+                          }}
+                        >
+                          Remove
+                        </button>
                       </td>
                     </tr>
                   ))}

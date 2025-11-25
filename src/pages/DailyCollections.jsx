@@ -149,56 +149,8 @@ export default function DailyCollections() {
     });
   };
 
-  const [showPrintView, setShowPrintView] = useState(false);
-
   const handlePrint = () => {
-    // Group transactions by customer
-    const customerGroups = {};
-    dailyTransactions.forEach(txn => {
-      const key = txn.customerPhone;
-      if (!customerGroups[key]) {
-        customerGroups[key] = {
-          customerName: txn.customerName,
-          customerPhone: txn.customerPhone,
-          agentName: txn.agentName,
-          accountNumber: txn.accountNumber,
-          village: txn.village,
-          transactions: []
-        };
-      }
-      customerGroups[key].transactions.push(txn);
-    });
-
-    // Print statement for each customer
-    Object.values(customerGroups).forEach((group, index) => {
-      // Calculate balance
-      const totalDeposits = group.transactions
-        .filter(t => t.type === 'deposit')
-        .reduce((sum, t) => sum + (t.amount || 0), 0);
-      const totalWithdrawals = group.transactions
-        .filter(t => t.type === 'withdrawal')
-        .reduce((sum, t) => sum + (t.netAmount || t.amount || 0), 0);
-      
-      printTransactionStatement({
-        title: 'Daily Collections - Customer Transactions',
-        customerInfo: {
-          name: group.customerName,
-          phone: group.customerPhone,
-          accountNumber: group.accountNumber || 'N/A',
-          agentName: group.agentName,
-          village: group.village || 'N/A',
-          totalBalance: totalDeposits - totalWithdrawals
-        },
-        transactions: group.transactions,
-        showSummary: true,
-        date: new Date(selectedDate).toLocaleDateString('en-IN')
-      });
-      
-      // Add delay between prints if multiple customers
-      if (index < Object.values(customerGroups).length - 1) {
-        setTimeout(() => {}, 500);
-      }
-    });
+    window.print();
   };
 
   if (loading) {

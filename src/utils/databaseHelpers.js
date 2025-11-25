@@ -1200,7 +1200,7 @@ export const processEarlyWithdrawal = async (agentPhone, customerPhone, withdraw
 };
 
 // Get all eligible customers for year-end bonus
-export const getAllEligibleCustomers = async () => {
+export const getAllEligibleCustomers = async (filterYear = null) => {
   try {
     const agents = await getAllAgents();
     const eligibleCustomers = [];
@@ -1212,6 +1212,15 @@ export const getAllEligibleCustomers = async () => {
           const eligibility = await calculateBonusEligibility(agent.phone, customerPhone);
           
           if (eligibility.eligible) {
+            // Filter by year if specified
+            if (filterYear) {
+              const startYear = new Date(eligibility.startDate).getFullYear();
+              // Check if customer started in the selected year
+              if (startYear !== filterYear) {
+                continue; // Skip this customer
+              }
+            }
+            
             // Check 12th month payment status
             const twelfthMonth = await checkTwelfthMonthPayment(
               agent.phone, 

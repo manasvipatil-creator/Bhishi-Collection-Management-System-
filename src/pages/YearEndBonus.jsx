@@ -9,12 +9,14 @@ export default function YearEndBonus() {
 
   useEffect(() => {
     loadEligibleCustomers();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear]);
 
   const loadEligibleCustomers = async () => {
     setLoading(true);
     try {
-      const customers = await getAllEligibleCustomers();
+      // Pass selected year to filter customers
+      const customers = await getAllEligibleCustomers(selectedYear);
       setEligibleCustomers(customers);
     } catch (error) {
       console.error("Error loading eligible customers:", error);
