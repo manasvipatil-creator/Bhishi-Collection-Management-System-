@@ -32,7 +32,7 @@ export default function DailyCollections() {
         getAllAgents(),
         getAllTransactions()
       ]);
-      
+
       setAgents(agentsData);
       setTransactions(transactionsData);
     } catch (error) {
@@ -87,7 +87,7 @@ export default function DailyCollections() {
   const calculateDailyData = () => {
     // Filter transactions for selected date
     let filteredTransactions = transactions.filter(t => t.date === selectedDate);
-    
+
     // Filter by agent if selected
     if (selectedAgent) {
       filteredTransactions = filteredTransactions.filter(t => t.agentPhone === selectedAgent);
@@ -96,14 +96,14 @@ export default function DailyCollections() {
     // Filter by selected customers if any
     if (selectedCustomers.length > 0) {
       const selectedCustomerPhones = selectedCustomers.map(c => c.phone);
-      filteredTransactions = filteredTransactions.filter(t => 
+      filteredTransactions = filteredTransactions.filter(t =>
         selectedCustomerPhones.includes(t.customerPhone)
       );
     }
 
     // Filter by search term
     if (searchTerm) {
-      filteredTransactions = filteredTransactions.filter(t => 
+      filteredTransactions = filteredTransactions.filter(t =>
         (t.customerName && t.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (t.customerPhone && t.customerPhone.includes(searchTerm)) ||
         (t.agentName && t.agentName.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -135,7 +135,7 @@ export default function DailyCollections() {
     const totalDeposits = filteredTransactions
       .filter(t => t.type === 'deposit')
       .reduce((sum, t) => sum + (t.amount || 0), 0);
-    
+
     const totalWithdrawals = filteredTransactions
       .filter(t => t.type === 'withdrawal')
       .reduce((sum, t) => sum + (t.netAmount || t.amount || 0), 0);
@@ -175,11 +175,11 @@ export default function DailyCollections() {
             <div className="col-md-6">
               <h4 className="mb-0">📅 Daily Collections</h4>
               <small className="text-muted">
-                {new Date(selectedDate).toLocaleDateString('en-IN', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
+                {new Date(selectedDate).toLocaleDateString('en-IN', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
                 })}
               </small>
             </div>
@@ -233,14 +233,14 @@ export default function DailyCollections() {
         <div className="col-md-3">
           <label className="form-label">Filter by Customers</label>
           <div className="d-flex gap-2">
-            <button 
+            <button
               className="btn btn-outline-primary btn-sm flex-grow-1"
               onClick={() => setShowCustomerModal(true)}
             >
               👥 Select Customers ({selectedCustomers.length})
             </button>
             {selectedCustomers.length > 0 && (
-              <button 
+              <button
                 className="btn btn-outline-danger btn-sm"
                 onClick={clearCustomerFilter}
                 title="Clear customer filter"
@@ -318,7 +318,7 @@ export default function DailyCollections() {
               <table className="table table-hover" id="transactions-table">
                 <thead className="table-light">
                   <tr>
-                    <th>Date</th>
+                    <th>Date & Time</th>
                     <th>Customer</th>
                     <th>Agent</th>
                     <th>Type</th>
@@ -355,10 +355,9 @@ export default function DailyCollections() {
                         </div>
                       </td>
                       <td>
-                        <span className={`badge ${
-                          txn.type === 'deposit' ? 'bg-success' : 
+                        <span className={`badge ${txn.type === 'deposit' ? 'bg-success' :
                           txn.type === 'withdrawal' ? 'bg-danger' : 'bg-secondary'
-                        }`}>
+                          }`}>
                           {txn.type?.toUpperCase()}
                         </span>
                       </td>
@@ -385,7 +384,7 @@ export default function DailyCollections() {
                 </tbody>
               </table>
             </div>
-            
+
             {/* Print-only footer */}
             <div className="d-none d-print-block mt-4 pt-4" style={{ borderTop: '2px solid #000' }}>
               <div className="row">
@@ -427,7 +426,7 @@ export default function DailyCollections() {
               {selectedAgent && ' for the selected agent'}
               {searchTerm && ' matching your search criteria'}.
             </p>
-            <button 
+            <button
               className="btn btn-primary"
               onClick={() => {
                 setSelectedDate(new Date().toISOString().split('T')[0]);
@@ -449,9 +448,9 @@ export default function DailyCollections() {
             <div className="modal-content">
               <div className="modal-header" style={{ background: 'linear-gradient(135deg, #ffa726 0%, #fb8c00 100%)', color: 'white' }}>
                 <h5 className="modal-title">👥 Manual Customer Selection</h5>
-                <button 
-                  type="button" 
-                  className="btn-close btn-close-white" 
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
                   onClick={() => setShowCustomerModal(false)}
                 ></button>
               </div>
@@ -461,13 +460,13 @@ export default function DailyCollections() {
                     Select customers from the list below. You can select multiple customers to filter transactions.
                   </small>
                 </div>
-                
+
                 {availableCustomers.length > 0 ? (
                   <div className="list-group" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                     {availableCustomers.map((customer, index) => {
                       const isSelected = selectedCustomers.some(c => c.phone === customer.phone);
                       return (
-                        <div 
+                        <div
                           key={customer.phone}
                           className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isSelected ? 'active' : ''}`}
                           onClick={() => handleCustomerSelection(customer)}
@@ -496,16 +495,16 @@ export default function DailyCollections() {
                 )}
               </div>
               <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
+                <button
+                  type="button"
+                  className="btn btn-secondary"
                   onClick={() => setShowCustomerModal(false)}
                 >
                   Cancel
                 </button>
-                <button 
-                  type="button" 
-                  className="btn btn-primary" 
+                <button
+                  type="button"
+                  className="btn btn-primary"
                   onClick={handleApplyCustomerFilter}
                 >
                   Apply Filter ({selectedCustomers.length} selected)
@@ -516,6 +515,245 @@ export default function DailyCollections() {
         </div>
       )}
 
+      {/* Print-only structured layout */}
+      <div className="print-only-view">
+        <div style={{ padding: '20mm', fontFamily: 'Arial, sans-serif', fontSize: '12px', lineHeight: '1.4' }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: '20px', borderBottom: '3px solid #000', paddingBottom: '15px' }}>
+            <h2 style={{ margin: '0 0 5px 0', fontSize: '24px', fontWeight: 'bold', color: '#1a1a1a' }}>
+              शिवराप्त भिशी (ग्राहक भेटगिरदस्त संचयन योजना २०१६-१७)
+            </h2>
+            <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}>Daily Collection Report</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '11px' }}>
+              <div style={{ textAlign: 'left' }}>
+                <strong>Date:</strong> {new Date(selectedDate).toLocaleDateString('en-IN', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <strong>Generated:</strong> {new Date().toLocaleString('en-IN')}
+              </div>
+            </div>
+            {(selectedAgent || selectedCustomers.length > 0) && (
+              <div style={{ marginTop: '8px', fontSize: '11px', color: '#666' }}>
+                {selectedAgent && <div><strong>Filtered by Agent:</strong> {agents.find(a => a.phone === selectedAgent)?.name}</div>}
+                {selectedCustomers.length > 0 && <div><strong>Filtered Customers:</strong> {selectedCustomers.length} selected</div>}
+              </div>
+            )}
+          </div>
+
+          {/* Summary Stats */}
+          {stats && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '15px',
+              marginBottom: '25px',
+              padding: '15px',
+              background: '#f8f9fa',
+              border: '1px solid #dee2e6',
+              borderRadius: '4px'
+            }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#28a745' }}>
+                  ₹{stats.totalDeposits.toLocaleString()}
+                </div>
+                <div style={{ fontSize: '10px', color: '#666', marginTop: '3px' }}>Total Deposits</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#dc3545' }}>
+                  ₹{stats.totalWithdrawals.toLocaleString()}
+                </div>
+                <div style={{ fontSize: '10px', color: '#666', marginTop: '3px' }}>Total Withdrawals</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#007bff' }}>
+                  ₹{stats.netCollection.toLocaleString()}
+                </div>
+                <div style={{ fontSize: '10px', color: '#666', marginTop: '3px' }}>Net Collection</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#17a2b8' }}>
+                  {stats.totalTransactions}
+                </div>
+                <div style={{ fontSize: '10px', color: '#666', marginTop: '3px' }}>Total Transactions</div>
+              </div>
+            </div>
+          )}
+
+          {/* Transaction Table */}
+          <div style={{ marginBottom: '25px' }}>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 'bold', color: '#1a1a1a' }}>
+              Transaction List ({dailyTransactions.length} transactions)
+            </h4>
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              fontSize: '10px',
+              border: '1px solid #000'
+            }}>
+              <thead>
+                <tr style={{ background: '#e9ecef' }}>
+                  <th style={{ border: '1px solid #000', padding: '8px 6px', textAlign: 'left', fontWeight: 'bold' }}>DATE & TIME</th>
+                  <th style={{ border: '1px solid #000', padding: '8px 6px', textAlign: 'left', fontWeight: 'bold' }}>CUSTOMER</th>
+                  <th style={{ border: '1px solid #000', padding: '8px 6px', textAlign: 'left', fontWeight: 'bold' }}>AGENT</th>
+                  <th style={{ border: '1px solid #000', padding: '8px 6px', textAlign: 'center', fontWeight: 'bold' }}>TYPE</th>
+                  <th style={{ border: '1px solid #000', padding: '8px 6px', textAlign: 'right', fontWeight: 'bold' }}>AMOUNT</th>
+                  <th style={{ border: '1px solid #000', padding: '8px 6px', textAlign: 'center', fontWeight: 'bold' }}>MODE</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dailyTransactions.map((txn, index) => (
+                  <tr key={index} style={{ borderBottom: '1px solid #dee2e6' }}>
+                    <td style={{ border: '1px solid #000', padding: '6px', verticalAlign: 'top' }}>
+                      <div style={{ fontWeight: 'bold' }}>
+                        {txn.date ? new Date(txn.date).toLocaleDateString('en-IN') : 'N/A'}
+                      </div>
+                      {txn.time && (
+                        <div style={{ fontSize: '9px', color: '#666' }}>{txn.time}</div>
+                      )}
+                    </td>
+                    <td style={{ border: '1px solid #000', padding: '6px', verticalAlign: 'top' }}>
+                      <div style={{ fontWeight: 'bold' }}>{txn.customerName || 'N/A'}</div>
+                      <div style={{ fontSize: '9px', color: '#666' }}>{txn.customerPhone}</div>
+                    </td>
+                    <td style={{ border: '1px solid #000', padding: '6px', verticalAlign: 'top' }}>
+                      <div style={{ fontWeight: 'bold' }}>{txn.agentName}</div>
+                      <div style={{ fontSize: '9px', color: '#666' }}>{txn.agentPhone}</div>
+                    </td>
+                    <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <span style={{
+                        padding: '3px 8px',
+                        borderRadius: '3px',
+                        background: txn.type === 'deposit' ? '#d4edda' : txn.type === 'withdrawal' ? '#f8d7da' : '#e2e3e5',
+                        color: txn.type === 'deposit' ? '#155724' : txn.type === 'withdrawal' ? '#721c24' : '#383d41',
+                        fontWeight: 'bold',
+                        fontSize: '9px'
+                      }}>
+                        {txn.type?.toUpperCase()}
+                      </span>
+                    </td>
+                    <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', verticalAlign: 'top' }}>
+                      <div style={{
+                        fontWeight: 'bold',
+                        color: txn.type === 'deposit' ? '#28a745' : '#dc3545',
+                        fontSize: '11px'
+                      }}>
+                        ₹{(txn.netAmount || txn.amount || 0).toLocaleString()}
+                      </div>
+                      {txn.bonusIncluded && (
+                        <div style={{ fontSize: '8px', color: '#28a745' }}>+₹{txn.bonusAmount} bonus</div>
+                      )}
+                      {txn.penaltyApplied && (
+                        <div style={{ fontSize: '8px', color: '#ffc107' }}>-₹{txn.penalty} penalty</div>
+                      )}
+                    </td>
+                    <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'center', verticalAlign: 'middle' }}>
+                      {txn.paymentMethod || txn.mode || 'Cash'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer with Summary and Signature */}
+          <div style={{
+            marginTop: '30px',
+            paddingTop: '20px',
+            borderTop: '2px solid #000'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px' }}>
+              {/* Summary Section */}
+              <div style={{ flex: '1', paddingRight: '20px' }}>
+                <h5 style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: 'bold' }}>Payment Summary:</h5>
+                <div style={{ fontSize: '11px', lineHeight: '1.6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span>Total Transactions:</span>
+                    <strong>{dailyTransactions.length}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#28a745' }}>
+                    <span>Total Deposits:</span>
+                    <strong>₹{stats?.totalDeposits.toLocaleString()}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#dc3545' }}>
+                    <span>Total Withdrawals:</span>
+                    <strong>₹{stats?.totalWithdrawals.toLocaleString()}</strong>
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginTop: '8px',
+                    paddingTop: '8px',
+                    borderTop: '1px solid #000',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}>
+                    <span>Net Collection:</span>
+                    <span style={{ color: stats?.netCollection >= 0 ? '#28a745' : '#dc3545' }}>
+                      ₹{stats?.netCollection.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Signature Section */}
+              <div style={{ flex: '1', paddingLeft: '20px', textAlign: 'right' }}>
+                <h5 style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: 'bold' }}>Verification:</h5>
+                <div style={{ marginTop: '40px', marginBottom: '10px' }}>
+                  <div style={{
+                    height: '1px',
+                    background: '#000',
+                    width: '200px',
+                    marginLeft: 'auto',
+                    marginBottom: '5px'
+                  }}></div>
+                  <div style={{ fontSize: '10px', fontWeight: 'bold' }}>Authorized Signature</div>
+                </div>
+                <div style={{ fontSize: '10px', color: '#666', marginTop: '5px' }}>
+                  Date: {new Date().toLocaleDateString('en-IN')}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Note */}
+            <div style={{
+              marginTop: '25px',
+              padding: '12px',
+              background: '#f8f9fa',
+              border: '1px solid #dee2e6',
+              textAlign: 'center',
+              fontSize: '9px',
+              color: '#666',
+              borderRadius: '4px'
+            }}>
+              <div style={{ marginBottom: '3px' }}>
+                <strong>Note:</strong> This is a computer-generated statement and does not require a physical signature.
+              </div>
+              <div>
+                For any queries or discrepancies, please contact your branch office immediately.
+              </div>
+            </div>
+          </div>
+
+          {/* Page Number - Footer */}
+          <div style={{
+            position: 'fixed',
+            bottom: '10mm',
+            left: '0',
+            right: '0',
+            textAlign: 'center',
+            fontSize: '9px',
+            color: '#999'
+          }}>
+            Page 1 of 1 | Generated on {new Date().toLocaleString('en-IN')}
+          </div>
+        </div>
+      </div>
+
       {/* Print Styles */}
       <style>{`
         .print-only-view {
@@ -523,6 +761,11 @@ export default function DailyCollections() {
         }
         
         @media print {
+          @page {
+            size: A4;
+            margin: 0;
+          }
+          
           .no-print {
             display: none !important;
           }
@@ -531,8 +774,10 @@ export default function DailyCollections() {
             margin: 0;
             padding: 0;
             font-family: 'Arial', sans-serif;
-            color: #000;
-            background: white;
+            color: #000 !important;
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           
           .container-fluid {
@@ -541,6 +786,28 @@ export default function DailyCollections() {
           
           .print-only-view {
             display: block !important;
+          }
+
+          table {
+            page-break-inside: auto;
+          }
+          
+          tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+          }
+          
+          thead {
+            display: table-header-group;
+          }
+          
+          tfoot {
+            display: table-footer-group;
+          }
+
+          /* Ensure borders are visible in PDF */
+          table, th, td {
+            border-color: #000 !important;
           }
         }
       `}</style>

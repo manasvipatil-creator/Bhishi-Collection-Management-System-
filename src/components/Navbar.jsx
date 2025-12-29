@@ -35,7 +35,7 @@ export default function Navbar() {
         {/* Left Section - Page Title */}
         <div className="d-flex align-items-center">
           <h4 className="mb-0 fw-bold" style={{ color: 'var(--text-primary)' }}>
-            SMART BHISHI
+            शिवशंभू भिशी  (ग्राहक भेठवस्तू संचयन योजना २०२६–२७)
           </h4>
           <span className="badge ms-3 px-3 py-2" 
                 style={{ 

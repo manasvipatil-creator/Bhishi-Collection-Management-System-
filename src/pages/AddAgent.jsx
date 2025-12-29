@@ -287,28 +287,37 @@ export default function AddAgent() {
 
   return (
     <div className="container-fluid fade-in-up">
+      <style>{`
+        /* Simple, professional Add Agent styles (scoped) */
+        .header-card { background: #f8fbff; border: 1px solid #e6eef7; border-radius:8px }
+        .header-card .card-body { padding:12px 16px }
+        .header-icon { width:48px; height:48px; border-radius:8px; background:#eaf2ff; display:flex; align-items:center; justify-content:center; font-size:1.25rem }
+        .form-card .card-header { background:transparent; border-bottom:1px solid #eef2f6; padding:12px 16px }
+        .route-badge { background:#f1f5f9; border:1px solid #e2e8f0; color:#0f172a; border-radius:6px }
+        .route-badge .btn-close { transform:scale(0.85) }
+        .input-group .btn-primary { min-width:120px }
+        .agent-summary .alert { background:#f8fafc; border:1px solid #e6eef7 }
+        @media (max-width:767px){ .header-card .card-body { display:block } }
+      `}</style>
       <div className="row justify-content-center">
         <div className="col-lg-8">
           {/* Header Card */}
-          <div className="card border-0 mb-4" style={{ background: 'var(--primary-gradient)', color: 'white' }}>
-            <div className="card-body p-4">
-              <div className="d-flex align-items-center">
-                <div className="me-3">
-                  <div className="rounded-circle d-flex align-items-center justify-content-center"
-                       style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.2)' }}>
-                    <span style={{ fontSize: '1.5rem' }}>👨‍💼</span>
-                  </div>
+          <div className="card border-0 mb-4 header-card">
+            <div className="card-body d-flex align-items-center">
+              <div className="me-3">
+                <div className="header-icon">
+                  <span>👨‍💼</span>
                 </div>
-                <div>
-                  <h4 className="mb-1 fw-bold">{isEditMode ? 'Edit Agent' : 'Add New Agent'}</h4>
-                  <p className="mb-0 opacity-75">{isEditMode ? 'Update agent information' : 'Register a new collection agent in the system'}</p>
-                </div>
+              </div>
+              <div>
+                <h4 className="mb-1 fw-semibold">{isEditMode ? 'Edit Agent' : 'Add New Agent'}</h4>
+                <p className="mb-0 text-muted small">{isEditMode ? 'Update agent information' : 'Register a new collection agent in the system'}</p>
               </div>
             </div>
           </div>
 
           {/* Form Card */}
-          <div className="card">
+          <div className="card form-card">
             <div className="card-header">
               <h6 className="mb-0">Agent Information</h6>
             </div>

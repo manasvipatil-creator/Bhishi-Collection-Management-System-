@@ -1,6 +1,25 @@
 import React, { useEffect, useState } from "react";
 import { getAllAgents, getAgentCustomers, getAllTransactions, addTransactionToAgent } from "../utils/databaseHelpers";
 import { exportToExcelWithFormat } from "../utils/excelExport";
+import {
+  FiCalendar,
+  FiUsers,
+  FiUser,
+  FiUserCheck,
+  FiSearch,
+  FiPlus,
+  FiPrinter,
+  FiDownload,
+  FiRefreshCcw,
+  FiArrowLeft,
+  FiMapPin,
+  FiPhone,
+  FiCheckCircle,
+  FiXCircle,
+  FiClock,
+  FiEdit2,
+  FiTrash2
+} from "react-icons/fi";
 
 export default function WeeklyCollections() {
   const [customers, setCustomers] = useState([]);
@@ -45,10 +64,10 @@ export default function WeeklyCollections() {
       const allCustomers = [];
       for (const agent of agentsData) {
         const agentCustomers = await getAgentCustomers(agent.phone);
-        allCustomers.push(...agentCustomers.map(c => ({ 
-          ...c, 
-          agentPhone: agent.phone, 
-          agentName: agent.name 
+        allCustomers.push(...agentCustomers.map(c => ({
+          ...c,
+          agentPhone: agent.phone,
+          agentName: agent.name
         })));
       }
       setCustomers(allCustomers);
@@ -65,7 +84,7 @@ export default function WeeklyCollections() {
     }
   };
 
-  const filteredCustomers = customers.filter(customer => 
+  const filteredCustomers = customers.filter(customer =>
     !selectedAgent || customer.agentPhone === selectedAgent
   );
 
@@ -75,7 +94,7 @@ export default function WeeklyCollections() {
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
 
-    const weeklyTransactions = transactions.filter(t => 
+    const weeklyTransactions = transactions.filter(t =>
       t.customerPhone === customer.phone &&
       t.type === 'deposit' &&
       new Date(t.date) >= weekStart &&
@@ -90,7 +109,7 @@ export default function WeeklyCollections() {
     if (weeklyTransactions.length > 0) {
       const firstTxn = weeklyTransactions[0];
       paymentDate = firstTxn.date;
-      
+
       if (firstTxn.time) {
         timeString = firstTxn.time;
       } else if (firstTxn.createdAt) {
@@ -133,16 +152,16 @@ export default function WeeklyCollections() {
 
   const calculatePenalty = (customer) => {
     // Calculate penalty from penalty transactions
-    const penaltyTransactions = transactions.filter(t => 
-      t.customerPhone === customer.phone && 
+    const penaltyTransactions = transactions.filter(t =>
+      t.customerPhone === customer.phone &&
       t.type === 'penalty'
     );
     return penaltyTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
   };
 
   const calculateTotalDeposits = (customer) => {
-    const depositTransactions = transactions.filter(t => 
-      t.customerPhone === customer.phone && 
+    const depositTransactions = transactions.filter(t =>
+      t.customerPhone === customer.phone &&
       t.type === 'deposit'
     );
     return depositTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
@@ -179,7 +198,7 @@ export default function WeeklyCollections() {
     try {
       const monthlyDue = Number(customer.monthlyDue) || 0;
       const penaltyAmount = monthlyDue * 0.05; // 5% penalty
-      
+
       if (penaltyAmount > 0) {
         // Record penalty transaction
         await addTransactionToAgent(customer.agentPhone, {
@@ -238,13 +257,13 @@ export default function WeeklyCollections() {
     const totalCustomers = filteredCustomers.length;
     const paidCustomers = filteredCustomers.filter(c => getCustomerWeeklyStatus(c).paid);
     const unpaidCustomers = filteredCustomers.filter(c => !getCustomerWeeklyStatus(c).paid);
-    
+
     const totalTargetAmount = filteredCustomers.reduce((sum, c) => sum + getCustomerWeeklyStatus(c).weeklyTarget, 0);
     const totalCollectedAmount = filteredCustomers.reduce((sum, c) => sum + getCustomerWeeklyStatus(c).amount, 0);
-    
+
     const collectionRate = totalCustomers > 0 ? (paidCustomers.length / totalCustomers) * 100 : 0;
     const amountCollectionRate = totalTargetAmount > 0 ? (totalCollectedAmount / totalTargetAmount) * 100 : 0;
-    
+
     return {
       totalCustomers,
       paidCount: paidCustomers.length,
@@ -262,28 +281,22 @@ export default function WeeklyCollections() {
   return (
     <div className="container-fluid fade-in-up">
       {/* Header */}
-      <div className="card border-0 mb-4" style={{ background: 'var(--warning-gradient)', color: 'white' }}>
-        <div className="card-body p-4">
-          <div className="d-flex align-items-center">
-            <div className="me-3">
-              <div className="rounded-circle d-flex align-items-center justify-content-center"
-                   style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.2)' }}>
-                <span style={{ fontSize: '1.5rem' }}>📅</span>
-              </div>
-            </div>
-            <div>
-              <h4 className="mb-1 fw-bold">Weekly Collections</h4>
-              <p className="mb-0 opacity-75">
-                Track weekly payments and manage penalties - Week {selectedWeek} 
-                ({weekStartDate.toLocaleDateString()} - {weekEndDate.toLocaleDateString()})
-              </p>
-            </div>
+      <div className="card border-0 mb-4" style={{ background: '#ffffff', border: '1px solid #e5e7eb' }}>
+        <div className="card-body p-4 d-flex align-items-center gap-3">
+          <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: 60, height: 60, background: '#eef2ff', color: '#4f46e5' }}>
+            <FiCalendar size={28} />
+          </div>
+          <div>
+            <h4 className="mb-1 fw-bold text-dark">Weekly Collections</h4>
+            <p className="mb-0 text-muted">
+              Track weekly payments and manage penalties · Week {selectedWeek} ({weekStartDate.toLocaleDateString()} - {weekEndDate.toLocaleDateString()})
+            </p>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="card mb-4">
+      <div className="card mb-4 border-0" style={{ border: '1px solid #e5e7eb' }}>
         <div className="card-body">
           <div className="row align-items-center">
             <div className="col-md-4">
@@ -315,27 +328,27 @@ export default function WeeklyCollections() {
             <div className="col-md-4">
               <label className="form-label">Quick Actions</label>
               <div>
-                <button 
-                  className="btn btn-outline-primary me-2"
+                <button
+                  className="btn btn-outline-primary me-2 d-inline-flex align-items-center gap-2"
                   onClick={() => setSelectedWeek(getCurrentWeek())}
                 >
-                  Current Week
+                  <FiRefreshCcw size={16} /> Current Week
                 </button>
-                <button 
-                  className="btn btn-outline-secondary me-2"
+                <button
+                  className="btn btn-outline-secondary me-2 d-inline-flex align-items-center gap-2"
                   onClick={() => setSelectedWeek(selectedWeek - 1)}
                   disabled={selectedWeek <= 1}
                 >
-                  Previous
+                  <FiArrowLeft size={16} /> Previous
                 </button>
-                <button 
-                  className="btn btn-primary me-2"
+                <button
+                  className="btn btn-outline-secondary me-2 d-inline-flex align-items-center gap-2"
                   onClick={handlePrint}
                 >
-                  🖨️ Print
+                  <FiPrinter size={16} /> Print
                 </button>
-                <button 
-                  className="btn btn-success"
+                <button
+                  className="btn btn-success d-inline-flex align-items-center gap-2"
                   onClick={() => {
                     const exportData = filteredCustomers.map(customer => {
                       const status = getCustomerWeeklyStatus(customer);
@@ -355,7 +368,7 @@ export default function WeeklyCollections() {
                     exportToExcelWithFormat(exportData, `weekly_collections_week_${selectedWeek}`);
                   }}
                 >
-                  📊 Export to Excel
+                  <FiDownload size={16} /> Export to Excel
                 </button>
               </div>
             </div>
@@ -384,24 +397,22 @@ export default function WeeklyCollections() {
           const paidCustomers = agentData.customers.filter(c => c.status.paid);
           const unpaidCustomers = agentData.customers.filter(c => !c.status.paid);
           const totalCollected = paidCustomers.reduce((sum, c) => sum + c.status.amount, 0);
-          
+
           return (
             <div key={agentPhone} style={{ marginBottom: '30px', pageBreakInside: 'avoid' }}>
-              {/* Agent Header */}
-              <div style={{ background: '#667eea', color: 'white', padding: '10px 15px', marginBottom: '10px' }}>
-                <h5 style={{ margin: '0', fontSize: '16px' }}>
-                  👨‍💼 Agent: {agentData.agentName}
+              <div style={{ background: '#4f46e5', color: 'white', padding: '10px 15px', marginBottom: '10px' }}>
+                <h5 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FiUsers size={14} /> Agent: {agentData.agentName}
                 </h5>
                 <p style={{ margin: '5px 0 0 0', fontSize: '12px' }}>Phone: {agentData.agentPhone}</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px', fontSize: '12px' }}>
                   <span>Total Customers: {agentData.customers.length}</span>
-                  <span style={{ color: '#90EE90' }}>Paid: {paidCustomers.length}</span>
-                  <span style={{ color: '#FFB6C1' }}>Unpaid: {unpaidCustomers.length}</span>
+                  <span style={{ color: '#bbf7d0', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><FiCheckCircle size={12} /> Paid: {paidCustomers.length}</span>
+                  <span style={{ color: '#fecaca', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><FiXCircle size={12} /> Unpaid: {unpaidCustomers.length}</span>
                   <span style={{ fontWeight: 'bold' }}>Collected: ₹{totalCollected.toLocaleString()}</span>
                 </div>
               </div>
 
-              {/* Customer Collections Table */}
               <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', fontSize: '12px' }}>
                 <thead>
                   <tr style={{ background: '#f0f0f0' }}>
@@ -414,57 +425,37 @@ export default function WeeklyCollections() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Paid Customers First */}
                   {paidCustomers.map((customer, idx) => {
                     const weeklyAmt = getCustomerWeeklyTarget(customer);
                     return (
-                      <tr key={idx} style={{ background: '#f0fff0' }}>
-                        <td style={{ border: '1px solid #ddd', padding: '6px' }}>
-                          {customer.name}
-                        </td>
-                        <td style={{ border: '1px solid #ddd', padding: '6px' }}>
-                          {customer.phone}
-                        </td>
-                        <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'right', fontWeight: 'bold' }}>
-                          ₹{weeklyAmt.toLocaleString()}
-                        </td>
+                      <tr key={`${agentPhone}-paid-${idx}`} style={{ background: '#f0fff0' }}>
+                        <td style={{ border: '1px solid #ddd', padding: '6px' }}>{customer.name}</td>
+                        <td style={{ border: '1px solid #ddd', padding: '6px' }}>{customer.phone}</td>
+                        <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'right', fontWeight: 'bold' }}>₹{weeklyAmt.toLocaleString()}</td>
                         <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'center' }}>
-                          <span style={{ background: '#27ae60', color: 'white', padding: '2px 8px', borderRadius: '3px', fontSize: '10px' }}>✅ PAID</span>
+                          <span style={{ background: '#27ae60', color: 'white', padding: '2px 8px', borderRadius: '3px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><FiCheckCircle size={10} /> PAID</span>
                         </td>
-                        <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'right', color: '#27ae60', fontWeight: 'bold' }}>
-                          ₹{customer.status.amount.toLocaleString()}
-                        </td>
+                        <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'right', color: '#27ae60', fontWeight: 'bold' }}>₹{customer.status.amount.toLocaleString()}</td>
                         <td style={{ border: '1px solid #ddd', padding: '6px' }}>
                           {new Date(customer.status.date).toLocaleDateString('en-IN')}
-                          <br/>
+                          <br />
                           <small>{customer.status.time || 'N/A'}</small>
                         </td>
                       </tr>
                     );
                   })}
-                  {/* Unpaid Customers */}
                   {unpaidCustomers.map((customer, idx) => {
                     const weeklyAmt = getCustomerWeeklyTarget(customer);
                     return (
-                      <tr key={idx} style={{ background: '#fff8f0' }}>
-                        <td style={{ border: '1px solid #ddd', padding: '6px' }}>
-                          {customer.name}
-                        </td>
-                        <td style={{ border: '1px solid #ddd', padding: '6px' }}>
-                          {customer.phone}
-                        </td>
-                        <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'right', fontWeight: 'bold' }}>
-                          ₹{weeklyAmt.toLocaleString()}
-                        </td>
+                      <tr key={`${agentPhone}-unpaid-${idx}`} style={{ background: '#fff8f0' }}>
+                        <td style={{ border: '1px solid #ddd', padding: '6px' }}>{customer.name}</td>
+                        <td style={{ border: '1px solid #ddd', padding: '6px' }}>{customer.phone}</td>
+                        <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'right', fontWeight: 'bold' }}>₹{weeklyAmt.toLocaleString()}</td>
                         <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'center' }}>
-                          <span style={{ background: '#e74c3c', color: 'white', padding: '2px 8px', borderRadius: '3px', fontSize: '10px' }}>❌ UNPAID</span>
+                          <span style={{ background: '#e74c3c', color: 'white', padding: '2px 8px', borderRadius: '3px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><FiXCircle size={10} /> UNPAID</span>
                         </td>
-                        <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'right', color: '#999' }}>
-                          ₹0
-                        </td>
-                        <td style={{ border: '1px solid #ddd', padding: '6px', color: '#999' }}>
-                          -
-                        </td>
+                        <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'right', color: '#999' }}>₹0</td>
+                        <td style={{ border: '1px solid #ddd', padding: '6px', color: '#999' }}>-</td>
                       </tr>
                     );
                   })}
@@ -472,12 +463,8 @@ export default function WeeklyCollections() {
                 <tfoot>
                   <tr style={{ background: '#f8f9fa', fontWeight: 'bold' }}>
                     <td colSpan="4" style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'right' }}>Agent Subtotal:</td>
-                    <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'right', color: '#27ae60' }}>
-                      ₹{totalCollected.toLocaleString()}
-                    </td>
-                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                      {paidCustomers.length}/{agentData.customers.length} paid
-                    </td>
+                    <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'right', color: '#27ae60' }}>₹{totalCollected.toLocaleString()}</td>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{paidCustomers.length}/{agentData.customers.length} paid</td>
                   </tr>
                 </tfoot>
               </table>
@@ -485,7 +472,6 @@ export default function WeeklyCollections() {
           );
         })}
 
-        {/* Grand Total Summary */}
         <div style={{ marginTop: '30px', borderTop: '2px solid #333', paddingTop: '15px' }}>
           <table style={{ width: '100%', fontSize: '14px' }}>
             <tbody>
@@ -521,182 +507,9 @@ export default function WeeklyCollections() {
           </table>
         </div>
       </div>
-
-      {/* Dynamic Statistics Dashboard */}
-      <div className="row mb-4">
-        <div className="col-md-3">
-          <div className="card border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-            <div className="card-body text-center">
-              <h3 className="fw-bold mb-1">{weeklyStats.totalCustomers}</h3>
-              <p className="mb-0 opacity-75">Total Customers</p>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-3">
-          <div className="card border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', color: 'white' }}>
-            <div className="card-body text-center">
-              <h3 className="fw-bold mb-1">{weeklyStats.paidCount}</h3>
-              <p className="mb-0 opacity-75">Paid ({weeklyStats.collectionRate.toFixed(1)}%)</p>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-3">
-          <div className="card border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #fc466b 0%, #3f5efb 100%)', color: 'white' }}>
-            <div className="card-body text-center">
-              <h3 className="fw-bold mb-1">₹{weeklyStats.totalCollectedAmount.toLocaleString()}</h3>
-              <p className="mb-0 opacity-75">Collected ({weeklyStats.amountCollectionRate.toFixed(1)}%)</p>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-3">
-          <div className="card border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}>
-            <div className="card-body text-center">
-              <h3 className="fw-bold mb-1">₹{weeklyStats.shortfall.toLocaleString()}</h3>
-              <p className="mb-0 opacity-75">Shortfall</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Collections Table - Screen view only */}
-      <div className="card border-0 shadow-sm screen-only">
-        <div className="card-header" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '20px' }}>
-          <h5 className="mb-0 fw-bold">Customer Collections - Week {selectedWeek}</h5>
-        </div>
-        <div className="card-body p-0">
-          {loading ? (
-            <div className="text-center p-5">
-              <div className="spinner"></div>
-              <p className="mt-3">Loading collections...</p>
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-hover mb-0">
-                <thead style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-                  <tr>
-                    <th style={{ padding: '15px', fontWeight: '600', borderBottom: 'none' }}>CUSTOMER</th>
-                    <th style={{ padding: '15px', fontWeight: '600', borderBottom: 'none' }}>AGENT</th>
-                    <th style={{ padding: '15px', fontWeight: '600', borderBottom: 'none' }}>WEEKLY AMOUNT</th>
-                    <th style={{ padding: '15px', fontWeight: '600', borderBottom: 'none' }}>AMOUNT PAID</th>
-                    <th style={{ padding: '15px', fontWeight: '600', borderBottom: 'none' }}>DATE & TIME</th>
-                    <th style={{ padding: '15px', fontWeight: '600', borderBottom: 'none', textAlign: 'center' }}>ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCustomers.map((customer) => {
-                    const status = getCustomerWeeklyStatus(customer);
-                    const penalty = calculatePenalty(customer);
-                    const bonus = calculateYearEndBonus(customer);
-                    const weeklyAmount = status.weeklyTarget; // Use dynamic weekly target
-
-                    return (
-                      <tr key={customer.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                        <td style={{ padding: '20px', verticalAlign: 'middle' }}>
-                          <div className="d-flex align-items-center">
-                            <div className="rounded-circle d-flex align-items-center justify-content-center me-3"
-                                 style={{ width: '45px', height: '45px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', fontSize: '1.2rem' }}>
-                              👤
-                            </div>
-                            <div>
-                              <div className="fw-bold" style={{ color: '#2c3e50', fontSize: '1rem' }}>{customer.name}</div>
-                              <small className="text-muted" style={{ fontSize: '0.85rem' }}>📞 {customer.phone}</small>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '20px', verticalAlign: 'middle' }}>
-                          <span className="badge" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', padding: '8px 15px', fontSize: '0.9rem', fontWeight: '500' }}>
-                            {customer.agentName || 'Unassigned'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '20px', verticalAlign: 'middle' }}>
-                          <span className="fw-bold" style={{ color: '#667eea', fontSize: '1.1rem' }}>
-                            ₹{weeklyAmount.toLocaleString()}
-                          </span>
-                        </td>
-                        <td style={{ padding: '20px', verticalAlign: 'middle' }}>
-                          {status.paid ? (
-                            <span className="fw-bold" style={{ color: '#27ae60', fontSize: '1.1rem' }}>
-                              ₹{status.amount.toLocaleString()}
-                            </span>
-                          ) : (
-                            <span className="text-muted" style={{ fontSize: '1rem' }}>₹0</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '20px', verticalAlign: 'middle' }}>
-                          {status.date ? (
-                            <div>
-                              <div className="fw-semibold" style={{ color: '#2c3e50', fontSize: '0.95rem' }}>
-                                📅 {new Date(status.date).toLocaleDateString('en-IN')}
-                              </div>
-                              <small className="text-muted" style={{ fontSize: '0.85rem' }}>⏰ {status.time || 'N/A'}</small>
-                            </div>
-                          ) : (
-                            <span className="badge bg-secondary" style={{ padding: '6px 12px' }}>No Payment</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '20px', verticalAlign: 'middle', textAlign: 'center' }}>
-                          <div className="d-flex gap-3 justify-content-center">
-                            <button
-                              className="btn btn-sm"
-                              onClick={() => {
-                                // Edit functionality
-                                const newAmount = prompt(`Edit payment amount for ${customer.name}:`, status.paid ? status.amount : weeklyAmount);
-                                if (newAmount && !isNaN(newAmount) && Number(newAmount) > 0) {
-                                  recordPayment(customer, newAmount);
-                                }
-                              }}
-                              title="Edit"
-                              style={{ 
-                                fontSize: '1.4rem', 
-                                border: 'none', 
-                                background: 'transparent',
-                                cursor: 'pointer',
-                                transition: 'transform 0.2s',
-                                padding: '5px 10px'
-                              }}
-                              onMouseEnter={(e) => e.target.style.transform = 'scale(1.2)'}
-                              onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              className="btn btn-sm"
-                              onClick={() => {
-                                if (window.confirm(`Are you sure you want to delete the payment record for ${customer.name}?`)) {
-                                  // Delete functionality - would need to implement deletePayment function
-                                  alert('Delete functionality to be implemented');
-                                }
-                              }}
-                              title="Delete"
-                              style={{ 
-                                fontSize: '1.4rem', 
-                                border: 'none', 
-                                background: 'transparent',
-                                cursor: 'pointer',
-                                transition: 'transform 0.2s',
-                                padding: '5px 10px'
-                              }}
-                              onMouseEnter={(e) => e.target.style.transform = 'scale(1.2)'}
-                              onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Print Styles */}
       <style>{`
         @media print {
-          /* Hide everything except print content */
           .sidebar,
           .navbar,
           button,
@@ -710,12 +523,10 @@ export default function WeeklyCollections() {
             display: none !important;
           }
 
-          /* Show print-only content */
           .print-only {
             display: block !important;
           }
 
-          /* Page setup */
           body {
             background: white !important;
             margin: 0;
@@ -728,20 +539,17 @@ export default function WeeklyCollections() {
             max-width: 100% !important;
           }
 
-          /* Page break settings */
           @page {
             margin: 1.5cm;
             size: A4;
           }
 
-          /* Ensure colors print */
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
           }
 
-          /* Table styling */
           table {
             page-break-inside: auto;
           }
@@ -760,7 +568,6 @@ export default function WeeklyCollections() {
           }
         }
 
-        /* Screen-only class */
         .screen-only {
           display: block;
         }

@@ -644,7 +644,7 @@ export default function Reports() {
             <div className="stats-icon" style={{ background: 'var(--primary-gradient)' }}>
               👨‍💼
             </div>
-            <h3 className="stats-number">{quickStats.activeAgents}</h3>
+            <h3 className="stats-number" style={{ fontSize: '1.5rem' }}>{quickStats.activeAgents}</h3>
             <p className="stats-label">Active Agents</p>
           </div>
         </div>
@@ -653,7 +653,7 @@ export default function Reports() {
             <div className="stats-icon" style={{ background: 'var(--success-gradient)' }}>
               📈
             </div>
-            <h3 className="stats-number">₹{quickStats.totalCollections.toLocaleString()}</h3>
+            <h3 className="stats-number" style={{ fontSize: '1.5rem' }}>₹{quickStats.totalCollections.toLocaleString()}</h3>
             <p className="stats-label">Total Collections</p>
           </div>
         </div>
@@ -662,7 +662,7 @@ export default function Reports() {
             <div className="stats-icon" style={{ background: 'var(--warning-gradient)' }}>
               ⚠️
             </div>
-            <h3 className="stats-number">₹{quickStats.totalPenalties.toLocaleString()}</h3>
+            <h3 className="stats-number" style={{ fontSize: '1.5rem' }}>₹{quickStats.totalPenalties.toLocaleString()}</h3>
             <p className="stats-label">Total Penalties</p>
           </div>
         </div>
@@ -671,7 +671,7 @@ export default function Reports() {
             <div className="stats-icon" style={{ background: 'var(--secondary-gradient)' }}>
               🎁
             </div>
-            <h3 className="stats-number">₹{quickStats.totalBonuses.toLocaleString()}</h3>
+            <h3 className="stats-number" style={{ fontSize: '1.5rem' }}>₹{quickStats.totalBonuses.toLocaleString()}</h3>
             <p className="stats-label">Year-End Bonuses</p>
           </div>
         </div>

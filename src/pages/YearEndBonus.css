@@ -1,0 +1,317 @@
+:root {
+  --primary-color: #4f46e5;
+  --primary-light: #e0e7ff;
+  --success-color: #10b981;
+  --success-light: #d1fae5;
+  --warning-color: #f59e0b;
+  --warning-light: #fef3c7;
+  --danger-color: #ef4444;
+  --danger-light: #fee2e2;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --radius: 0.5rem;
+}
+
+.yeb-container {
+  padding: 1.5rem;
+  background-color: var(--gray-50);
+  min-height: 100vh;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--gray-800);
+}
+
+/* Header */
+.yeb-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  background: white;
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.yeb-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--gray-800);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.yeb-year-select {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  font-weight: 500;
+  color: var(--gray-700);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.yeb-year-select:focus {
+  border-color: var(--primary-color);
+}
+
+/* Stats Grid */
+.yeb-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.yeb-stat-card {
+  background: white;
+  padding: 1.25rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  transition: transform 0.2s;
+}
+
+.yeb-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.yeb-stat-icon {
+  padding: 0.75rem;
+  border-radius: 50%;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yeb-stat-content h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.yeb-stat-content p {
+  color: var(--gray-500);
+  font-size: 0.875rem;
+  margin: 0.25rem 0 0;
+}
+
+/* Rules Section - Compact */
+.yeb-rules-toggle {
+  background: white;
+  border: 1px solid var(--gray-200);
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  color: var(--gray-700);
+}
+
+.yeb-rules-content {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--gray-200);
+}
+
+.yeb-rule-box {
+  padding: 1rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+}
+
+.yeb-rule-box ul {
+  padding-left: 1.25rem;
+  margin: 0.5rem 0 0;
+}
+
+/* Toolbar */
+.yeb-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background: white;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+}
+
+.yeb-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.yeb-process-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--radius);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.yeb-process-btn:hover:not(:disabled) {
+  background-color: #4338ca;
+}
+
+.yeb-process-btn:disabled {
+  background-color: var(--gray-200);
+  color: var(--gray-500);
+  cursor: not-allowed;
+}
+
+/* Table */
+.yeb-table-container {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  border: 1px solid var(--gray-200);
+}
+
+/* Custom Scrollbar for Table */
+.yeb-table-container .table-responsive::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.yeb-table-container .table-responsive::-webkit-scrollbar-track {
+  background: var(--gray-100);
+  border-radius: 4px;
+}
+
+.yeb-table-container .table-responsive::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: 4px;
+}
+
+.yeb-table-container .table-responsive::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-400);
+}
+
+.yeb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  table-layout: auto;
+}
+
+.yeb-table th {
+  background-color: #f8f9fa;
+  color: var(--gray-500);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  padding: 1rem;
+  border-bottom: 2px solid var(--gray-200);
+  white-space: nowrap;
+}
+
+.yeb-table td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--gray-100);
+  color: var(--gray-700);
+}
+
+.yeb-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.yeb-table tbody tr:hover {
+  background-color: #fafbfc;
+}
+
+.yeb-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.yeb-badge-success {
+  background: var(--success-light);
+  color: var(--success-color);
+}
+
+.yeb-badge-warning {
+  background: var(--warning-light);
+  color: var(--warning-color);
+}
+
+.yeb-badge-danger {
+  background: var(--danger-light);
+  color: var(--danger-color);
+}
+
+.yeb-badge-gray {
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+
+/* Utilities */
+.text-right {
+  text-align: right;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+.text-muted {
+  color: var(--gray-500);
+}
+
+.text-success {
+  color: var(--success-color);
+}
+
+/* Fade In */
+.fade-in-up {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

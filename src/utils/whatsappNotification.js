@@ -20,7 +20,7 @@ export const sendDepositNotification = async (data) => {
     // Log the raw incoming data for debugging
     console.log('=== sendDepositNotification called ===');
     console.log('Raw data received:', JSON.stringify(data, null, 2));
-    
+
     const {
       customerPhone,
       customerName,
@@ -51,8 +51,8 @@ export const sendDepositNotification = async (data) => {
 
     // Format phone number - ensure it starts with 91
     const cleanPhone = String(customerPhone).replace(/\D/g, ''); // Remove non-digits
-    const formattedPhone = cleanPhone.startsWith('91') 
-      ? cleanPhone 
+    const formattedPhone = cleanPhone.startsWith('91')
+      ? cleanPhone
       : `91${cleanPhone}`;
 
     // Ensure all values are properly formatted
@@ -92,7 +92,7 @@ export const sendDepositNotification = async (data) => {
 
     const result = await response.json().catch(() => ({ success: true }));
     console.log('Deposit notification sent successfully:', result);
-    
+
     return {
       success: true,
       message: 'Deposit notification sent',
@@ -140,8 +140,8 @@ export const sendWithdrawalNotification = async (data) => {
 
     // Format phone number - ensure it starts with 91
     const cleanPhone = String(customerPhone).replace(/\D/g, ''); // Remove non-digits
-    const formattedPhone = cleanPhone.startsWith('91') 
-      ? cleanPhone 
+    const formattedPhone = cleanPhone.startsWith('91')
+      ? cleanPhone
       : `91${cleanPhone}`;
 
     // Ensure all values are properly formatted
@@ -181,7 +181,7 @@ export const sendWithdrawalNotification = async (data) => {
 
     const result = await response.json().catch(() => ({ success: true }));
     console.log('Withdrawal notification sent successfully:', result);
-    
+
     return {
       success: true,
       message: 'Withdrawal notification sent',
@@ -229,8 +229,8 @@ export const sendCreditNotification = async (data) => {
 
     // Format phone number - ensure it starts with 91
     const cleanPhone = String(customerPhone).replace(/\D/g, ''); // Remove non-digits
-    const formattedPhone = cleanPhone.startsWith('91') 
-      ? cleanPhone 
+    const formattedPhone = cleanPhone.startsWith('91')
+      ? cleanPhone
       : `91${cleanPhone}`;
 
     // Ensure all values are properly formatted
@@ -270,7 +270,7 @@ export const sendCreditNotification = async (data) => {
 
     const result = await response.json().catch(() => ({ success: true }));
     console.log('Credit notification sent successfully:', result);
-    
+
     return {
       success: true,
       message: 'Credit notification sent',

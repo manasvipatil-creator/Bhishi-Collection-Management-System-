@@ -1,7 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ref, get } from "firebase/database";
 import { db } from "../firebase";
 import { exportToExcelWithFormat } from "../utils/excelExport";
+import {
+  FiCalendar,
+  FiFilter,
+  FiRefreshCcw,
+  FiPrinter,
+  FiDownload,
+  FiArrowRightCircle,
+  FiUploadCloud,
+  FiTrendingUp,
+  FiTrendingDown,
+  FiUsers,
+  FiUserCheck,
+  FiFolder,
+  FiCreditCard,
+  FiBriefcase,
+  FiPieChart,
+  FiFileText,
+  FiInbox
+} from "react-icons/fi";
 
 export default function MonthlyCollections() {
   const [transactions, setTransactions] = useState([]);
@@ -178,19 +197,109 @@ export default function MonthlyCollections() {
     };
   };
 
-  const stats = calculateMonthlyStats();
+  const stats = useMemo(() => calculateMonthlyStats(), [filteredCollections]);
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  const getTypeIcon = (type) => {
-    return '💰';
+  const paymentModeIconMap = {
+    cash: FiBriefcase,
+    online: FiUploadCloud,
+    cheque: FiFileText,
+    default: FiCreditCard
   };
 
-  const getTypeBadge = (type) => {
-    return 'bg-success';
+  const transactionTypeMeta = {
+    deposit: {
+      Icon: FiTrendingUp,
+      badgeClass: "bg-success"
+    },
+    withdrawal: {
+      Icon: FiTrendingDown,
+      badgeClass: "bg-danger"
+    }
+  };
+
+  const renderPaymentModeIcon = (mode) => {
+    const key = (mode || "default").toLowerCase();
+    const Icon = paymentModeIconMap[key] || paymentModeIconMap.default;
+    return <Icon size={14} className="me-1" />;
+  };
+
+  const statsCards = useMemo(() => [
+    {
+      label: "Total Deposits",
+      value: stats.totalDeposits,
+      prefix: "₹",
+      Icon: FiTrendingUp,
+      iconBg: "rgba(16, 185, 129, 0.12)",
+      iconColor: "#047857"
+    },
+    {
+      label: "Total Withdrawals",
+      value: stats.totalWithdrawals,
+      prefix: "₹",
+      Icon: FiTrendingDown,
+      iconBg: "rgba(239, 68, 68, 0.12)",
+      iconColor: "#b91c1c"
+    },
+    {
+      label: "Net Amount",
+      value: stats.totalAmount,
+      prefix: "₹",
+      Icon: FiPieChart,
+      iconBg: "rgba(59, 130, 246, 0.12)",
+      iconColor: "#1d4ed8"
+    },
+    {
+      label: "Total Transactions",
+      value: stats.totalCollections,
+      prefix: "",
+      Icon: FiFolder,
+      iconBg: "rgba(234, 179, 8, 0.12)",
+      iconColor: "#b45309"
+    }
+  ], [stats]);
+
+  const renderTransactionTypeBadge = (type) => {
+    const meta = transactionTypeMeta[type] || transactionTypeMeta.deposit;
+    const { Icon, badgeClass } = meta;
+    return (
+      <span
+        className={`badge ${badgeClass}`}
+        style={{
+          minWidth: "110px",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "6px"
+        }}
+      >
+        <Icon size={12} />
+        {type === "withdrawal" ? "Withdrawal" : "Deposit"}
+      </span>
+    );
+  };
+
+  const renderPaymentModeBadge = (mode) => {
+    const label = (mode || "Cash").toUpperCase();
+    return (
+      <span
+        className="badge bg-info"
+        style={{
+          minWidth: "110px",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "6px"
+        }}
+      >
+        {renderPaymentModeIcon(mode)}
+        {label}
+      </span>
+    );
   };
 
   // Print function
@@ -347,21 +456,32 @@ export default function MonthlyCollections() {
   return (
     <div className="container-fluid fade-in-up">
       {/* Header */}
-      <div className="card border-0 mb-4" style={{ background: 'var(--primary-gradient)', color: 'white' }}>
-        <div className="card-body p-4">
+      <div className="card border-0 shadow-sm mb-4">
+        <div className="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
           <div className="d-flex align-items-center">
-            <div className="me-3">
-              <div className="rounded-circle d-flex align-items-center justify-content-center"
-                   style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.2)' }}>
-                <span style={{ fontSize: '1.5rem' }}>📊</span>
-              </div>
+            <div
+              className="rounded-circle d-flex align-items-center justify-content-center me-3"
+              style={{ width: '52px', height: '52px', background: 'rgba(59,130,246,0.12)', color: '#1d4ed8' }}
+            >
+              <FiCalendar size={22} />
             </div>
             <div>
-              <h4 className="mb-1 fw-bold">Monthly Collections</h4>
-              <p className="mb-0 opacity-75">
-                View and analyze monthly collection data - {monthNames[selectedMonth - 1]} {selectedYear}
+              <h4 className="mb-1 fw-bold text-dark">Monthly Collections</h4>
+              <p className="mb-0 text-muted">
+                Overview for {monthNames[selectedMonth - 1]} {selectedYear}
               </p>
             </div>
+          </div>
+          <div className="d-flex flex-column align-items-md-end text-muted small gap-1">
+            <span className="d-inline-flex align-items-center gap-2">
+              <FiCalendar size={14} /> {monthNames[selectedMonth - 1]} {selectedYear}
+            </span>
+            {selectedAgent && (
+              <span className="d-inline-flex align-items-center gap-2">
+                <FiUserCheck size={14} />
+                {agents.find(a => a.phone === selectedAgent)?.name || selectedAgent}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -371,76 +491,85 @@ export default function MonthlyCollections() {
         <div className="card-body">
           <div className="row align-items-center">
             <div className="col-md-3">
-              <label className="form-label">Select Month</label>
-              <select
-                className="form-control"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              >
-                {monthNames.map((month, index) => (
-                  <option key={index} value={index + 1}>
-                    {month}
-                  </option>
-                ))}
-              </select>
+              <label className="form-label text-muted">Select Month</label>
+              <div className="input-icon select-icon">
+                <FiCalendar size={16} />
+                <select
+                  className="form-control"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                >
+                  {monthNames.map((month, index) => (
+                    <option key={index} value={index + 1}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="col-md-3">
-              <label className="form-label">Select Year</label>
-              <select
-                className="form-control"
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
-              >
-                {[2023, 2024, 2025, 2026].map(year => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
+              <label className="form-label text-muted">Select Year</label>
+              <div className="input-icon select-icon">
+                <FiCalendar size={16} />
+                <select
+                  className="form-control"
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                >
+                  {[2023, 2024, 2025, 2026].map(year => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="col-md-3">
-              <label className="form-label">Select Agent</label>
-              <select
-                className="form-control"
-                value={selectedAgent}
-                onChange={(e) => setSelectedAgent(e.target.value)}
-              >
-                <option value="">All Agents</option>
-                {agents.map((agent) => (
-                  <option key={agent.phone} value={agent.phone}>
-                    {agent.name} ({agent.phone})
-                  </option>
-                ))}
-              </select>
+              <label className="form-label text-muted">Select Agent</label>
+              <div className="input-icon select-icon">
+                <FiUsers size={16} />
+                <select
+                  className="form-control"
+                  value={selectedAgent}
+                  onChange={(e) => setSelectedAgent(e.target.value)}
+                >
+                  <option value="">All Agents</option>
+                  {agents.map((agent) => (
+                    <option key={agent.phone} value={agent.phone}>
+                      {agent.name} ({agent.phone})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="col-md-3">
-              <label className="form-label">Quick Actions</label>
-              <div>
-                <button 
-                  className="btn btn-outline-primary me-2"
+              <label className="form-label text-muted">Quick Actions</label>
+              <div className="d-flex flex-wrap gap-2">
+                <button
+                  className="btn btn-outline-primary d-flex align-items-center gap-2"
                   onClick={() => {
                     setSelectedMonth(new Date().getMonth() + 1);
                     setSelectedYear(new Date().getFullYear());
                   }}
                 >
-                  Current Month
+                  <FiRefreshCcw size={16} /> Current Month
                 </button>
-                <button 
-                  className="btn btn-outline-secondary me-2"
+                <button
+                  className="btn btn-outline-secondary d-flex align-items-center gap-2"
                   onClick={() => {
                     setSelectedAgent("");
                   }}
                 >
-                  Clear Filters
+                  <FiFilter size={16} /> Clear Filters
                 </button>
-                <button 
-                  className="btn btn-primary me-2"
+                <button
+                  className="btn btn-primary d-flex align-items-center gap-2"
                   onClick={handlePrint}
                 >
-                  🖨️ Print
+                  <FiPrinter size={16} /> Print
                 </button>
-                <button 
-                  className="btn btn-success"
+                <button
+                  className="btn btn-success d-flex align-items-center gap-2"
                   onClick={() => {
                     const exportData = filteredCollections.map(txn => ({
                       'Date': txn.date,
@@ -454,7 +583,7 @@ export default function MonthlyCollections() {
                     exportToExcelWithFormat(exportData, `monthly_collections_${selectedMonth}_${selectedYear}`);
                   }}
                 >
-                  📊 Export to Excel
+                  <FiDownload size={16} /> Export
                 </button>
               </div>
             </div>
@@ -463,43 +592,24 @@ export default function MonthlyCollections() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="row mb-4">
-        <div className="col-md-3">
-          <div className="stats-card">
-            <div className="stats-icon" style={{ background: 'var(--success-gradient)' }}>
-              💰
+      <div className="row g-3 mb-4">
+        {statsCards.map(({ label, value, prefix, Icon, iconBg, iconColor }) => (
+          <div className="col-md-3" key={label}>
+            <div className="stats-card">
+              <div
+                className="stats-icon"
+                style={{ background: iconBg, color: iconColor }}
+              >
+                <Icon size={20} />
+              </div>
+              <h3 className="stats-number">
+                {prefix}
+                {typeof value === 'number' ? value.toLocaleString() : value}
+              </h3>
+              <p className="stats-label text-muted">{label}</p>
             </div>
-            <h3 className="stats-number">₹{stats.totalDeposits.toLocaleString()}</h3>
-            <p className="stats-label">Total Deposits</p>
           </div>
-        </div>
-        <div className="col-md-3">
-          <div className="stats-card">
-            <div className="stats-icon" style={{ background: 'var(--danger-gradient)' }}>
-              💸
-            </div>
-            <h3 className="stats-number">₹{stats.totalWithdrawals.toLocaleString()}</h3>
-            <p className="stats-label">Total Withdrawals</p>
-          </div>
-        </div>
-        <div className="col-md-3">
-          <div className="stats-card">
-            <div className="stats-icon" style={{ background: 'var(--primary-gradient)' }}>
-              📊
-            </div>
-            <h3 className="stats-number">₹{stats.totalAmount.toLocaleString()}</h3>
-            <p className="stats-label">Net Amount</p>
-          </div>
-        </div>
-        <div className="col-md-3">
-          <div className="stats-card">
-            <div className="stats-icon" style={{ background: 'var(--warning-gradient)' }}>
-              📋
-            </div>
-            <h3 className="stats-number">{stats.totalCollections}</h3>
-            <p className="stats-label">Total Transactions</p>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Agent Performance */}
@@ -514,18 +624,26 @@ export default function MonthlyCollections() {
                 const agent = agents.find(a => a.phone === agentPhone);
                 const netAmount = data.deposits - data.withdrawals;
                 return (
-                  <div key={agentPhone} className="border-bottom pb-2 mb-2">
+                  <div key={agentPhone} className="border-bottom pb-3 mb-3">
                     <div className="d-flex justify-content-between align-items-center">
-                      <div>
-                        <span className="me-2">👨‍💼</span>
-                        <span className="fw-semibold">{agent?.name || agentPhone}</span>
-                        <small className="text-muted ms-1">({data.count} transactions)</small>
+                      <div className="d-flex align-items-center gap-2">
+                        <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: 36, height: 36, background: 'rgba(79,70,229,0.12)', color: '#4338ca' }}>
+                          <FiUserCheck size={16} />
+                        </div>
+                        <div>
+                          <span className="fw-semibold d-block">{agent?.name || agentPhone}</span>
+                          <small className="text-muted">{data.count} transactions</small>
+                        </div>
                       </div>
-                      <span className="fw-bold">₹{netAmount.toLocaleString()}</span>
+                      <span className="fw-bold text-dark">₹{netAmount.toLocaleString()}</span>
                     </div>
-                    <div className="mt-1">
-                      <small className="text-success me-3">Deposits: ₹{data.deposits.toLocaleString()}</small>
-                      <small className="text-danger">Withdrawals: ₹{data.withdrawals.toLocaleString()}</small>
+                    <div className="mt-2 d-flex flex-wrap gap-3">
+                      <small className="text-success d-inline-flex align-items-center gap-1">
+                        <FiTrendingUp size={14} /> Deposits: ₹{data.deposits.toLocaleString()}
+                      </small>
+                      <small className="text-danger d-inline-flex align-items-center gap-1">
+                        <FiTrendingDown size={14} /> Withdrawals: ₹{data.withdrawals.toLocaleString()}
+                      </small>
                     </div>
                   </div>
                 );
@@ -535,28 +653,28 @@ export default function MonthlyCollections() {
         </div>
       </div>
 
-      {/* Debug Info */}
+      {/* Data Summary */}
       {transactions.length > 0 && (
         <div className="card mb-4">
           <div className="card-header">
-            <h6 className="mb-0">Debug Information</h6>
+            <h6 className="mb-0 d-flex align-items-center gap-2"><FiFolder size={16} /> Data Summary</h6>
           </div>
           <div className="card-body">
-            <div className="row">
+            <div className="row g-3">
               <div className="col-md-3">
-                <small className="text-muted">Total Transactions Loaded:</small>
+                <small className="text-muted d-flex align-items-center gap-1"><FiFolder size={12} /> Total Transactions</small>
                 <div className="fw-bold">{transactions.length}</div>
               </div>
               <div className="col-md-3">
-                <small className="text-muted">Transaction Types:</small>
+                <small className="text-muted d-flex align-items-center gap-1"><FiPieChart size={12} /> Transaction Types</small>
                 <div className="fw-bold">{[...new Set(transactions.map(t => t.type))].join(', ')}</div>
               </div>
               <div className="col-md-3">
-                <small className="text-muted">Deposits:</small>
+                <small className="text-muted d-flex align-items-center gap-1"><FiTrendingUp size={12} /> Deposits</small>
                 <div className="fw-bold">{transactions.filter(t => t.type === 'deposit').length}</div>
               </div>
               <div className="col-md-3">
-                <small className="text-muted">Withdrawals:</small>
+                <small className="text-muted d-flex align-items-center gap-1"><FiTrendingDown size={12} /> Withdrawals</small>
                 <div className="fw-bold">{transactions.filter(t => t.type === 'withdrawal').length}</div>
               </div>
             </div>
@@ -587,8 +705,8 @@ export default function MonthlyCollections() {
             <div key={agentPhone} style={{ marginBottom: '30px', pageBreakInside: 'avoid' }}>
               {/* Agent Header */}
               <div style={{ background: '#667eea', color: 'white', padding: '10px 15px', marginBottom: '10px' }}>
-                <h5 style={{ margin: '0', fontSize: '16px' }}>
-                  👨‍💼 Agent: {agentData.agentName}
+                <h5 style={{ margin: '0', fontSize: '16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <FiUserCheck size={14} /> Agent: {agentData.agentName}
                 </h5>
                 <p style={{ margin: '5px 0 0 0', fontSize: '12px' }}>Phone: {agentData.agentPhone}</p>
                 <p style={{ margin: '5px 0 0 0', fontSize: '12px' }}>Total Transactions: {agentData.transactions.length}</p>
@@ -621,8 +739,9 @@ export default function MonthlyCollections() {
                       <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'right', color: '#e74c3c' }}>
                         {txn.withdrawAmount > 0 ? `₹${txn.withdrawAmount.toLocaleString()}` : '-'}
                       </td>
-                      <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'center' }}>
-                        {txn.paymentMethod || txn.mode || 'Cash'}
+                      <td style={{ border: '1px solid #ddd', padding: '6px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                        {renderPaymentModeIcon(txn.paymentMethod || txn.mode)}
+                        {(txn.paymentMethod || txn.mode || 'Cash').toUpperCase()}
                       </td>
                     </tr>
                   ))}
@@ -651,15 +770,15 @@ export default function MonthlyCollections() {
           <table style={{ width: '100%', fontSize: '14px' }}>
             <tbody>
               <tr>
-                <td style={{ padding: '5px', fontWeight: 'bold' }}>Total Deposits:</td>
+                <td style={{ padding: '5px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}><FiTrendingUp size={12} /> Total Deposits:</td>
                 <td style={{ padding: '5px', textAlign: 'right', color: '#27ae60', fontWeight: 'bold' }}>₹{stats.totalDeposits.toLocaleString()}</td>
               </tr>
               <tr>
-                <td style={{ padding: '5px', fontWeight: 'bold' }}>Total Withdrawals:</td>
+                <td style={{ padding: '5px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}><FiTrendingDown size={12} /> Total Withdrawals:</td>
                 <td style={{ padding: '5px', textAlign: 'right', color: '#e74c3c', fontWeight: 'bold' }}>₹{stats.totalWithdrawals.toLocaleString()}</td>
               </tr>
               <tr style={{ borderTop: '2px solid #333' }}>
-                <td style={{ padding: '10px 5px', fontSize: '16px', fontWeight: 'bold' }}>Grand Total:</td>
+                <td style={{ padding: '10px 5px', fontSize: '16px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}><FiPieChart size={14} /> Grand Total:</td>
                 <td style={{ padding: '10px 5px', textAlign: 'right', fontSize: '16px', fontWeight: 'bold' }}>₹{stats.totalAmount.toLocaleString()}</td>
               </tr>
             </tbody>
@@ -697,9 +816,11 @@ export default function MonthlyCollections() {
                   {filteredCollections.length === 0 ? (
                     <tr>
                       <td colSpan="5" className="text-center py-4">
-                        <div className="text-muted">
-                          <span style={{ fontSize: '2rem' }}>📭</span>
-                          <p className="mt-2">No collections found for {monthNames[selectedMonth - 1]} {selectedYear}</p>
+                        <div className="text-muted d-flex flex-column align-items-center gap-2">
+                          <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: 54, height: 54, background: 'rgba(148,163,184,0.12)', color: '#475569' }}>
+                            <FiInbox size={22} />
+                          </div>
+                          <p className="mt-2 mb-0">No collections found for {monthNames[selectedMonth - 1]} {selectedYear}</p>
                         </div>
                       </td>
                     </tr>
@@ -731,19 +852,9 @@ export default function MonthlyCollections() {
                           )}
                         </td>
                         <td>
-                          <div>
-                            <span className={`badge ${collection.type === 'deposit' ? 'bg-success' : 'bg-danger'} mb-1`}>
-                              {collection.type === 'deposit' ? '💰 Deposit' : '💸 Withdrawal'}
-                            </span>
-                            <br/>
-                            <span className="badge bg-info">
-                              {(collection.paymentMethod || collection.mode) === 'cash' && '💵'}
-                              {(collection.paymentMethod || collection.mode) === 'online' && '💳'}
-                              {(collection.paymentMethod || collection.mode) === 'cheque' && '📄'}
-                              {!(collection.paymentMethod || collection.mode) && '💵'}
-                              {' '}
-                              {collection.paymentMethod || collection.mode || 'Cash'}
-                            </span>
+                          <div className="d-flex flex-column gap-1">
+                            {renderTransactionTypeBadge(collection.type)}
+                            {renderPaymentModeBadge(collection.paymentMethod || collection.mode)}
                           </div>
                         </td>
                       </tr>

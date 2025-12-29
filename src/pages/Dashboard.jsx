@@ -1,4 +1,10 @@
 import { useEffect, useState } from "react";
+import {
+  FiUsers,
+  FiUserCheck,
+  FiDollarSign,
+  FiCalendar
+} from "react-icons/fi";
 import { ref, get } from "firebase/database";
 import { db } from "../firebase";
 
@@ -112,25 +118,25 @@ export default function Dashboard() {
     {
       title: "Total Agents",
       value: stats.totalAgents,
-      icon: "👨‍💼",
+      Icon: FiUsers,
       color: "#007bff"
     },
     {
       title: "Total Customers",
       value: stats.totalCustomers,
-      icon: "👥",
+      Icon: FiUserCheck,
       color: "#28a745"
     },
     {
       title: "Total Amount",
       value: `₹${stats.totalAmount.toLocaleString()}`,
-      icon: "💰",
+      Icon: FiDollarSign,
       color: "#ffc107"
     },
     {
       title: "Total Collections",
       value: stats.totalCollections,
-      icon: "📅",
+      Icon: FiCalendar,
       color: "#6f42c1"
     }
   ];
@@ -144,7 +150,7 @@ export default function Dashboard() {
         <div className="col-12">
           <div className="card">
             <div className="card-body">
-              <h3 className="mb-2">Bishi Collection Dashboard</h3>
+              <h3 className="mb-2">Bhishi Collection Dashboard</h3>
               <p className="text-muted mb-0">Manage your collection business efficiently</p>
             </div>
           </div>
@@ -157,10 +163,8 @@ export default function Dashboard() {
           <div key={index} className="col-lg-3 col-md-6 mb-3">
             <div className="card">
               <div className="card-body text-center">
-                <div className="mb-3">
-                  <span style={{ fontSize: '2rem', color: stat.color }}>
-                    {stat.icon}
-                  </span>
+                <div className="mb-3 d-inline-flex align-items-center justify-content-center rounded-circle" style={{ width: 56, height: 56, backgroundColor: `${stat.color}1a`, color: stat.color }}>
+                  <stat.Icon size={28} />
                 </div>
                 <h4 className="mb-2">{stat.value}</h4>
                 <p className="text-muted mb-0">{stat.title}</p>

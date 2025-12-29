@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { getAllEligibleCustomers, addTransactionToAgent } from "../utils/databaseHelpers";
+import "./YearEndBonus.css";
 
 export default function YearEndBonus() {
   const [eligibleCustomers, setEligibleCustomers] = useState([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [statusFilter, setStatusFilter] = useState('All Status');
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   useEffect(() => {
     loadEligibleCustomers();
@@ -15,7 +18,6 @@ export default function YearEndBonus() {
   const loadEligibleCustomers = async () => {
     setLoading(true);
     try {
-      // Pass selected year to filter customers
       const customers = await getAllEligibleCustomers(selectedYear);
       setEligibleCustomers(customers);
     } catch (error) {
@@ -31,7 +33,7 @@ export default function YearEndBonus() {
     }
 
     setProcessing(true);
-    
+
     try {
       let totalBonusProcessed = 0;
       let customersProcessed = 0;
@@ -40,13 +42,11 @@ export default function YearEndBonus() {
 
       for (const customer of eligibleCustomers) {
         const bonusAmount = customer.bonusAmount;
-        
+
         if (bonusAmount > 0) {
-          // Determine bonus type
           const isFullBonus = bonusAmount === 1000;
           const bonusType = isFullBonus ? 'Full Bonus (₹1,000)' : 'No Bonus';
-          
-          // Record bonus transaction in agent's transactions
+
           await addTransactionToAgent(customer.agentPhone, {
             customerPhone: customer.customerPhone,
             customerId: customer.customerId,
@@ -59,22 +59,18 @@ export default function YearEndBonus() {
 
           totalBonusProcessed += bonusAmount;
           customersProcessed++;
-          
-          if (isFullBonus) {
-            fullBonusCount++;
-          } else {
-            partialBonusCount++;
-          }
+
+          if (isFullBonus) fullBonusCount++;
+          else partialBonusCount++;
         }
       }
 
       alert(`Year-end bonuses processed successfully!\n\n` +
-            `Total Customers: ${customersProcessed}\n` +
-            `Full Bonus (₹12,000): ${fullBonusCount}\n` +
-            `Accumulated Only: ${partialBonusCount}\n` +
-            `Total Amount: ₹${totalBonusProcessed.toLocaleString()}`);
-      
-      // Reload data
+        `Total Customers: ${customersProcessed}\n` +
+        `Full Bonus (₹12,000): ${fullBonusCount}\n` +
+        `Accumulated Only: ${partialBonusCount}\n` +
+        `Total Amount: ₹${totalBonusProcessed.toLocaleString()}`);
+
       loadEligibleCustomers();
     } catch (error) {
       alert("Error processing bonuses: " + error.message);
@@ -83,8 +79,13 @@ export default function YearEndBonus() {
     }
   };
 
-  // Show all customers (no filtering)
-  const filteredCustomers = eligibleCustomers;
+  const filteredCustomers = eligibleCustomers.filter(customer => {
+    if (statusFilter === 'All Status') return true;
+    const isFullBonus = customer.totalDeposits >= 12000;
+    if (statusFilter === 'Full Bonus') return isFullBonus;
+    if (statusFilter === 'In Progress') return !isFullBonus;
+    return true;
+  });
 
   const totalEligibleCustomers = eligibleCustomers.length;
   const fullBonusCustomers = eligibleCustomers.filter(c => c.bonusAmount === 12000).length;
@@ -92,250 +93,236 @@ export default function YearEndBonus() {
   const totalBonusAmount = eligibleCustomers.reduce((sum, customer) => sum + customer.bonusAmount, 0);
 
   return (
-    <div className="container-fluid fade-in-up">
+    <div className="yeb-container fade-in-up">
       {/* Header */}
-      <div className="card border-0 mb-4" style={{ background: 'linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%)', color: 'white' }}>
-        <div className="card-body p-4">
-          <div className="d-flex align-items-center justify-content-between">
-            <div className="d-flex align-items-center">
-              <div className="me-3">
-                <div className="rounded-circle d-flex align-items-center justify-content-center"
-                     style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.2)' }}>
-                  <span style={{ fontSize: '1.5rem' }}>🎁</span>
-                </div>
-              </div>
-              <div>
-                <h4 className="mb-1 fw-bold">Year-End Bonus System (12-Month Plan)</h4>
-                <p className="mb-0 opacity-75">₹12,000 bonus for customers completing 12 months with timely payments</p>
-              </div>
-            </div>
-            <div className="text-end">
-              <div className="mb-2">
-                <label className="form-label text-white">Select Year</label>
-                <select
-                  className="form-control"
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  style={{ width: '120px' }}
-                >
-                  {[2025, 2024, 2023, 2022, 2021].map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
+      <div className="yeb-header">
+        <div className="yeb-title">
+          <span style={{ fontSize: '1.5rem' }}>🎁</span>
+          <div>
+            <div>Year-End Bonus System</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', fontWeight: '400' }}>
+              Process bonuses for {selectedYear}
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Bonus Rules Info */}
-      <div className="card mb-4 border-info">
-        <div className="card-header bg-info text-white">
-          <h6 className="mb-0">📋 Bonus System Rules</h6>
-        </div>
-        <div className="card-body">
-          <div className="row">
-            <div className="col-md-4">
-              <div className="p-3 bg-success bg-opacity-10 rounded mb-3">
-                <h6 className="text-success mb-2">✅ Full Bonus (₹12,000)</h6>
-                <ul className="mb-0 small">
-                  <li>Complete 12 months of ₹1,000/month payments</li>
-                  <li>Total deposits of ₹12,000</li>
-                  <li>AND 12th month payment made on time</li>
-                </ul>
-              </div>
-            </div>
-            <div className="col-md-4">
-              <div className="p-3 bg-warning bg-opacity-10 rounded mb-3">
-                <h6 className="text-warning mb-2">⚠️ Accumulated Amount Only</h6>
-                <ul className="mb-0 small">
-                  <li>Completed 12 months but 12th month payment was delayed</li>
-                  <li>Receive only accumulated deposits (no bonus)</li>
-                </ul>
-              </div>
-            </div>
-            <div className="col-md-4">
-              <div className="p-3 bg-danger bg-opacity-10 rounded mb-3">
-                <h6 className="text-danger mb-2">❌ Early Withdrawal Penalty</h6>
-                <ul className="mb-0 small">
-                  <li>5% deduction on withdrawals before 12 months</li>
-                  <li>No penalty after completing 12 months</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Summary Stats */}
-      <div className="row mb-4">
-        <div className="col-md-3">
-          <div className="stats-card">
-            <div className="stats-icon" style={{ background: 'var(--primary-gradient)' }}>
-              👥
-            </div>
-            <h3 className="stats-number">{totalEligibleCustomers}</h3>
-            <p className="stats-label">Total Eligible Customers</p>
-          </div>
-        </div>
-        <div className="col-md-3">
-          <div className="stats-card">
-            <div className="stats-icon" style={{ background: 'var(--success-gradient)' }}>
-              ✅
-            </div>
-            <h3 className="stats-number">{fullBonusCustomers}</h3>
-            <p className="stats-label">Full Bonus (₹13,000)</p>
-          </div>
-        </div>
-        <div className="col-md-3">
-          <div className="stats-card">
-            <div className="stats-icon" style={{ background: 'var(--warning-gradient)' }}>
-              ⚠️
-            </div>
-            <h3 className="stats-number">{partialBonusCustomers}</h3>
-            <p className="stats-label">Accumulated Only</p>
-          </div>
-        </div>
-        <div className="col-md-3">
-          <div className="stats-card">
-            <div className="stats-icon" style={{ background: 'var(--secondary-gradient)' }}>
-              💰
-            </div>
-            <h3 className="stats-number">₹{totalBonusAmount.toLocaleString()}</h3>
-            <p className="stats-label">Total Bonus Amount</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Process Button */}
-      <div className="card mb-4">
-        <div className="card-body text-center p-4">
-          <h5 className="mb-3">Process Year-End Bonuses for {selectedYear}</h5>
-          <p className="text-muted mb-4">
-            This will distribute bonuses to all eligible customers based on the 13-month plan rules.
-            <br />
-            <strong>Full Bonus (₹13,000): {fullBonusCustomers} customers</strong> | 
-            <strong className="ms-2">Accumulated Only: {partialBonusCustomers} customers</strong>
-            <br />
-            <strong className="text-success">Total bonus to be distributed: ₹{totalBonusAmount.toLocaleString()}</strong>
-          </p>
-          <button
-            className="btn btn-success btn-lg"
-            onClick={processYearEndBonuses}
-            disabled={processing || totalBonusAmount === 0}
+        <div>
+          <select
+            className="yeb-year-select"
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
           >
-            {processing ? (
-              <>
-                <div className="spinner-border spinner-border-sm me-2" role="status">
-                  <span className="visually-hidden">Loading...</span>
-                </div>
-                Processing Bonuses...
-              </>
-            ) : (
-              <>
-                <span className="me-2">🎁</span>
-                Process Year-End Bonuses
-              </>
-            )}
-          </button>
+            {[2025, 2024, 2023, 2022, 2021].map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Customer Bonus Details */}
-      <div className="card">
-        <div className="card-header">
-          <h6 className="mb-0">Customer Bonus Details - {selectedYear}</h6>
+      {/* Stats Grid */}
+      <div className="yeb-stats-grid">
+        <div className="yeb-stat-card">
+          <div className="yeb-stat-content">
+            <h3>{totalEligibleCustomers}</h3>
+            <p>Eligible Customers</p>
+          </div>
+          <div className="yeb-stat-icon" style={{ background: 'var(--primary-light)', color: 'var(--primary-color)' }}>
+            👥
+          </div>
         </div>
-        <div className="card-body p-0">
-          {loading ? (
-            <div className="text-center p-5">
-              <div className="spinner-border" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
-              <p className="mt-3">Loading customer data...</p>
-            </div>
-          ) : filteredCustomers.length === 0 ? (
-            <div className="text-center p-5">
-              <p className="text-muted">No eligible customers found for year-end bonus.</p>
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table mb-0">
-                <thead>
-                  <tr>
-                    <th>Customer</th>
-                    <th>Agent</th>
-                    <th>Start Date</th>
-                    <th>Months Completed</th>
-                    <th>Total Deposits</th>
-                    <th>12th Month Status</th>
-                    <th>Bonus Amount</th>
-                    <th>Total Amount Pay</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCustomers.map((customer, index) => {
-                    const isFullBonus = customer.bonusAmount === 1000;
-                    const twelfthMonth = customer.twelfthMonthStatus;
+        <div className="yeb-stat-card">
+          <div className="yeb-stat-content">
+            <h3>{fullBonusCustomers}</h3>
+            <p>Full Bonus</p>
+          </div>
+          <div className="yeb-stat-icon" style={{ background: 'var(--success-light)', color: 'var(--success-color)' }}>
+            ✅
+          </div>
+        </div>
+        <div className="yeb-stat-card">
+          <div className="yeb-stat-content">
+            <h3>{partialBonusCustomers}</h3>
+            <p>Accumulated Only</p>
+          </div>
+          <div className="yeb-stat-icon" style={{ background: 'var(--warning-light)', color: 'var(--warning-color)' }}>
+            ⚠️
+          </div>
+        </div>
+        <div className="yeb-stat-card">
+          <div className="yeb-stat-content">
+            <h3 className="text-success">₹{totalBonusAmount.toLocaleString()}</h3>
+            <p>Total Bonus Payout</p>
+          </div>
+          <div className="yeb-stat-icon" style={{ background: 'var(--success-light)', color: 'var(--success-color)' }}>
+            💰
+          </div>
+        </div>
+      </div>
 
-                    return (
-                      <tr key={index} className={!isFullBonus ? 'table-warning' : ''}>
-                        <td>
-                          <div>
-                            <div className="fw-semibold">{customer.customerName}</div>
-                            <small className="text-muted">{customer.customerPhone}</small>
-                          </div>
-                        </td>
-                        <td>
-                          <div>
-                            <div>{customer.agentName}</div>
-                            <small className="text-muted">{customer.agentPhone}</small>
-                          </div>
-                        </td>
-                        <td>{customer.startDate}</td>
-                        <td>
-                          <span className="badge bg-info">
-                            {customer.completedMonths} / 12 months
-                          </span>
-                        </td>
-                        <td className="fw-bold">₹{customer.totalDeposits.toLocaleString()}</td>
-                        <td>
-                          {twelfthMonth.hasMissedPayment ? (
-                            <span className="badge bg-warning text-dark">
-                              ⚠️ Delayed ({twelfthMonth.missedDays} days)
-                            </span>
-                          ) : (
-                            <span className="badge bg-success">
-                              ✅ On Time (₹{twelfthMonth.amount})
-                            </span>
-                          )}
-                        </td>
-                        <td className="fw-bold">
-                          {isFullBonus ? (
-                            <span className="text-success">₹1,000</span>
-                          ) : (
-                            <span className="text-warning">₹{customer.bonusAmount.toLocaleString()}</span>
-                          )}
-                        </td>
-                        <td className="fw-bold text-primary">
-                          ₹{(customer.totalDeposits + customer.bonusAmount).toLocaleString()}
-                        </td>
-                        <td>
-                          {isFullBonus ? (
-                            <span className="badge bg-success">✅ Full Bonus</span>
-                          ) : (
-                            <span className="badge bg-warning">⚠️ Accumulated Only</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+      {/* Rules Toggle */}
+      <div className="card border-0 shadow-sm mb-4">
+        <div
+          className="card-header bg-white border-bottom-0 d-flex justify-content-between align-items-center cursor-pointer p-3"
+          onClick={() => setShowRules(!showRules)}
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="d-flex align-items-center gap-2">
+            <span className="badge bg-light text-dark border">ℹ️ Info</span>
+            <span className="fw-semibold">Bonus System Rules</span>
+          </div>
+          <span className="text-muted">{showRules ? '▼' : '▶'}</span>
         </div>
+        {showRules && (
+          <div className="card-body pt-0 border-top">
+            <div className="yeb-rules-content mt-0 border-0 pt-3">
+              <div className="yeb-rule-box" style={{ background: 'var(--success-light)', color: 'var(--success-color)' }}>
+                <strong>✅ Full Bonus (₹12,000)</strong>
+                <ul>
+                  <li>12 months of ₹1,000 payments</li>
+                  <li>Total deposits ₹12,000</li>
+                  <li>Ontime 12th payment</li>
+                </ul>
+              </div>
+              <div className="yeb-rule-box" style={{ background: 'var(--warning-light)', color: '#92400e' }}>
+                <strong>⚠️ Accumulated Only</strong>
+                <ul>
+                  <li>12 months completed</li>
+                  <li>Delayed 12th month payment</li>
+                  <li>No bonus applied</li>
+                </ul>
+              </div>
+              <div className="yeb-rule-box" style={{ background: 'var(--danger-light)', color: 'var(--danger-color)' }}>
+                <strong>❌ Penalty</strong>
+                <ul>
+                  <li>5% cut if withdrawn early</li>
+                  <li>Penalty free after 12 months</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Main Content Area */}
+      <div className="yeb-toolbar">
+        <div className="yeb-filter-group">
+          <span className="text-muted small fw-bold text-uppercase">Filter:</span>
+          <select
+            className="form-select form-select-sm"
+            style={{ width: '150px', borderColor: 'var(--gray-200)' }}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="All Status">All Status</option>
+            <option value="Full Bonus">✅ Full Bonus</option>
+            <option value="In Progress">⏳ In Progress</option>
+          </select>
+        </div>
+        <button
+          className="yeb-process-btn"
+          onClick={processYearEndBonuses}
+          disabled={processing || totalBonusAmount === 0}
+        >
+          {processing ? 'Processing...' : 'Process Bonuses'}
+        </button>
+      </div>
+
+      <div className="yeb-table-container">
+        {loading ? (
+          <div className="text-center p-5">
+            <div className="spinner-border text-primary" role="status"></div>
+            <p className="mt-3 text-muted">Loading data...</p>
+          </div>
+        ) : filteredCustomers.length === 0 ? (
+          <div className="text-center p-5 text-muted">
+            No eligible customers found for {selectedYear}.
+          </div>
+        ) : (
+          <div className="table-responsive" style={{ maxHeight: '600px' }}>
+            <table className="yeb-table">
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                <tr>
+                  <th style={{ textAlign: 'left', minWidth: '200px' }}>CUSTOMER / AGENT</th>
+                  <th style={{ textAlign: 'left', minWidth: '130px' }}>TIMELINE</th>
+                  <th style={{ textAlign: 'right', minWidth: '120px' }}>TOTAL DEPOSITS</th>
+                  <th style={{ textAlign: 'center', minWidth: '120px' }}>12TH MONTH</th>
+                  <th style={{ textAlign: 'right', minWidth: '100px' }}>BONUS</th>
+                  <th style={{ textAlign: 'right', minWidth: '120px' }}>PAYOUT</th>
+                  <th style={{ textAlign: 'center', minWidth: '120px' }}>STATUS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCustomers.map((customer, index) => {
+                  const isFullBonus = customer.totalDeposits >= 12000;
+                  const twelfthMonth = customer.twelfthMonthStatus;
+                  const isDelayed = twelfthMonth.hasMissedPayment;
+
+                  return (
+                    <tr key={index}>
+                      <td style={{ verticalAlign: 'middle' }}>
+                        <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>
+                          {customer.customerName}
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                          {customer.customerPhone}
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#9ca3af', marginTop: '4px' }}>
+                          Agent: {customer.agentName}
+                        </div>
+                      </td>
+                      <td style={{ verticalAlign: 'middle' }}>
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '6px' }}>
+                          Started: {customer.startDate}
+                        </div>
+                        <div>
+                          <span className="yeb-badge yeb-badge-gray">
+                            {customer.completedMonths} / 12 mos
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
+                        <span style={{ fontWeight: '600', color: '#1f2937', fontSize: '0.95rem' }}>
+                          ₹{customer.totalDeposits.toLocaleString()}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                        {isDelayed ? (
+                          <span className="yeb-badge yeb-badge-warning">
+                            Delayed ({twelfthMonth.missedDays}d)
+                          </span>
+                        ) : (
+                          <span className="yeb-badge yeb-badge-success">
+                            On Time
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
+                        {isFullBonus ? (
+                          <span style={{ color: 'var(--success-color)', fontWeight: '600', fontSize: '0.95rem' }}>
+                            +₹1,000
+                          </span>
+                        ) : (
+                          <span style={{ color: '#9ca3af', fontWeight: '500' }}>-</span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
+                        <span style={{ fontWeight: '600', color: 'var(--primary-color)', fontSize: '0.95rem' }}>
+                          ₹{(customer.totalDeposits + (isFullBonus ? 1000 : 0)).toLocaleString()}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                        {isFullBonus ? (
+                          <span className="yeb-badge yeb-badge-success">Full Bonus</span>
+                        ) : (
+                          <span className="yeb-badge yeb-badge-gray">In Progress</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

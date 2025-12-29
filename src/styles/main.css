@@ -187,6 +187,42 @@ body {
   box-shadow: var(--shadow-lg);
 }
 
+.icon-button {
+  padding: 0 !important;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--primary-color);
+  box-shadow: none;
+}
+
+.icon-button svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.icon-button.icon-button--primary {
+  color: #0d6efd;
+}
+
+.icon-button.icon-button--primary:hover {
+  background: rgba(13, 110, 253, 0.1);
+}
+
+.icon-button.icon-button--danger {
+  color: #dc2626;
+}
+
+.icon-button.icon-button--danger:hover {
+  background: rgba(220, 38, 38, 0.1);
+}
+
 /* Form Styles */
 .form-control {
   border: 2px solid var(--border-color);
@@ -201,6 +237,27 @@ body {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
   background: var(--bg-secondary);
+}
+
+.input-icon,
+.select-icon {
+  position: relative;
+}
+
+.input-icon svg,
+.select-icon svg {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+}
+
+.input-icon input,
+.input-icon select,
+.select-icon input,
+.select-icon select {
+  padding-left: 48px;
 }
 
 .form-label {

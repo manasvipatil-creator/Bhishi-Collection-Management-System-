@@ -106,7 +106,7 @@ export default function ViewCustomers() {
       (agent) =>
         agent.agentName.toLowerCase().includes(value) ||
         agent.agentId.toLowerCase().includes(value) ||
-        agent.customers.some(customer => 
+        agent.customers.some(customer =>
           customer.name.toLowerCase().includes(value) ||
           customer.phoneNumber.includes(value) ||
           customer.village.toLowerCase().includes(value)
@@ -160,14 +160,14 @@ export default function ViewCustomers() {
 
   // Navigate to transactions page with customer details
   const handleViewTransactions = (customer, agent) => {
-    navigate('/transactions', { 
-      state: { 
+    navigate('/transactions', {
+      state: {
         agentPhone: agent.agentMobile,
         agentName: agent.agentName,
         customerPhone: customer.phoneNumber,
         customerName: customer.name,
         customerId: customer.customerKey
-      } 
+      }
     });
   };
 
@@ -182,7 +182,7 @@ export default function ViewCustomers() {
           <div className="d-flex align-items-center">
             <div className="me-3">
               <div className="rounded-circle d-flex align-items-center justify-content-center"
-                   style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.2)' }}>
+                style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.2)' }}>
                 <span style={{ fontSize: '1.5rem' }}>👥</span>
               </div>
             </div>
@@ -219,13 +219,13 @@ export default function ViewCustomers() {
         filteredAgents.map((agent) => {
           const isExpanded = expandedAgents.includes(agent.agentMobile);
           const totalCustomers = agent.customers.length;
-          
+
           return (
             <div key={agent.agentMobile} className="card mb-3">
               {/* Agent Header - Clickable */}
-              <div 
+              <div
                 className="card-header d-flex justify-content-between align-items-center"
-                style={{ 
+                style={{
                   cursor: 'pointer',
                   background: isExpanded ? 'var(--primary-gradient)' : '#f8f9fa',
                   color: isExpanded ? 'white' : '#333',
@@ -236,12 +236,12 @@ export default function ViewCustomers() {
                 <div className="d-flex align-items-center">
                   <div className="me-3">
                     <div className="rounded-circle d-flex align-items-center justify-content-center"
-                         style={{ 
-                           width: '50px', 
-                           height: '50px', 
-                           background: isExpanded ? 'rgba(255,255,255,0.2)' : 'var(--primary-gradient)',
-                           color: isExpanded ? 'white' : 'white'
-                         }}>
+                      style={{
+                        width: '50px',
+                        height: '50px',
+                        background: isExpanded ? 'rgba(255,255,255,0.2)' : 'var(--primary-gradient)',
+                        color: isExpanded ? 'white' : 'white'
+                      }}>
                       <span style={{ fontSize: '1.5rem' }}>👨‍💼</span>
                     </div>
                   </div>

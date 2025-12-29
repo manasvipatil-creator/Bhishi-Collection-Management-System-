@@ -7,14 +7,16 @@ import { useAuth } from "../context/AuthContext";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setEmailError("");
+    setPasswordError("");
     setLoading(true);
 
     try {
@@ -27,15 +29,18 @@ export default function Login() {
 
       if (snapshot.exists()) {
         const adminData = snapshot.val();
-        
+
         console.log("Admin data from Firebase:", adminData);
         console.log("Entered email:", email);
         console.log("Entered password:", password);
         console.log("Stored email:", adminData.email);
         console.log("Stored password:", adminData.password);
-        
-        // Check credentials
-        if (email === adminData.email && password === adminData.password) {
+
+        // Check credentials separately
+        const isEmailValid = email === adminData.email;
+        const isPasswordValid = password === adminData.password;
+
+        if (isEmailValid && isPasswordValid) {
           // Login successful
           console.log("✅ Login successful!");
           login({
@@ -45,16 +50,23 @@ export default function Login() {
           });
           navigate("/");
         } else {
-          console.log("❌ Credentials don't match");
-          setError("Invalid email or password");
+          // Set specific error messages
+          if (!isEmailValid) {
+            console.log("❌ Invalid email");
+            setEmailError("Invalid email address");
+          }
+          if (!isPasswordValid) {
+            console.log("❌ Invalid password");
+            setPasswordError("Invalid password");
+          }
         }
       } else {
         console.log("❌ Admin node not found in Firebase");
-        setError("Admin credentials not found. Please contact support.");
+        setEmailError("Admin credentials not found. Please contact support.");
       }
     } catch (err) {
       console.error("Login error:", err);
-      setError("An error occurred during login. Please try again.");
+      setEmailError("An error occurred during login. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -99,18 +111,6 @@ export default function Login() {
           <p className="text-muted">Admin Login</p>
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="alert alert-danger" role="alert" style={{
-            borderRadius: '12px',
-            border: 'none',
-            background: '#fee',
-            color: '#c33'
-          }}>
-            {error}
-          </div>
-        )}
-
         {/* Login Form */}
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
@@ -128,13 +128,26 @@ export default function Login() {
               style={{
                 padding: '12px 16px',
                 borderRadius: '12px',
-                border: '2px solid #e2e8f0',
+                border: emailError ? '2px solid #f56565' : '2px solid #e2e8f0',
                 fontSize: '1rem',
                 transition: 'all 0.3s'
               }}
-              onFocus={(e) => e.target.style.borderColor = '#667eea'}
-              onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+              onFocus={(e) => e.target.style.borderColor = emailError ? '#f56565' : '#667eea'}
+              onBlur={(e) => e.target.style.borderColor = emailError ? '#f56565' : '#e2e8f0'}
             />
+            {emailError && (
+              <div style={{
+                color: '#f56565',
+                fontSize: '0.875rem',
+                marginTop: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <span>⚠️</span>
+                <span>{emailError}</span>
+              </div>
+            )}
           </div>
 
           <div className="mb-4">
@@ -152,13 +165,26 @@ export default function Login() {
               style={{
                 padding: '12px 16px',
                 borderRadius: '12px',
-                border: '2px solid #e2e8f0',
+                border: passwordError ? '2px solid #f56565' : '2px solid #e2e8f0',
                 fontSize: '1rem',
                 transition: 'all 0.3s'
               }}
-              onFocus={(e) => e.target.style.borderColor = '#667eea'}
-              onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+              onFocus={(e) => e.target.style.borderColor = passwordError ? '#f56565' : '#667eea'}
+              onBlur={(e) => e.target.style.borderColor = passwordError ? '#f56565' : '#e2e8f0'}
             />
+            {passwordError && (
+              <div style={{
+                color: '#f56565',
+                fontSize: '0.875rem',
+                marginTop: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <span>⚠️</span>
+                <span>{passwordError}</span>
+              </div>
+            )}
           </div>
 
           <button

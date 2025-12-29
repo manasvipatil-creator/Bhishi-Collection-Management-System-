@@ -42,14 +42,14 @@ export default function AddCollection() {
         // Try to get customer details from database
         const customersRef = ref(db, 'agents');
         const agentsSnapshot = await get(customersRef);
-        
+
         let customerData = null;
         let agentName = 'Agent';
         let totalAmount = Number(data.amountDeposited);
-        
+
         if (agentsSnapshot.exists()) {
           const agents = agentsSnapshot.val();
-          
+
           // Search for customer by ID across all agents
           for (const [agentPhone, agentData] of Object.entries(agents)) {
             if (agentData.customers) {
@@ -57,7 +57,9 @@ export default function AddCollection() {
                 if (customer.customerId === data.customerId || customer.phone === data.customerId) {
                   customerData = customer;
                   agentName = agentData.agentInfo?.agentName || 'Agent';
-                  totalAmount = (customer.totalDeposits || 0) + Number(data.amountDeposited);
+                  // Use balance if available (net balance), otherwise use totalDeposits
+                  const currentBalance = customer.balance !== undefined ? customer.balance : (customer.totalDeposits || 0);
+                  totalAmount = Number(currentBalance) + Number(data.amountDeposited);
                   break;
                 }
               }
@@ -65,7 +67,7 @@ export default function AddCollection() {
             if (customerData) break;
           }
         }
-        
+
         // Send notification if we have customer phone
         if (customerData && customerData.phone) {
           await sendDepositNotification({
@@ -107,7 +109,7 @@ export default function AddCollection() {
               <div className="d-flex align-items-center">
                 <div className="me-3">
                   <div className="rounded-circle d-flex align-items-center justify-content-center"
-                       style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.2)' }}>
+                    style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.2)' }}>
                     <span style={{ fontSize: '1.5rem' }}>💰</span>
                   </div>
                 </div>

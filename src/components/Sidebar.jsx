@@ -1,23 +1,37 @@
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
+import {
+  FiHome,
+  FiMap,
+  FiUserPlus,
+  FiUsers,
+  FiUser,
+  FiCreditCard,
+  FiCalendar,
+  FiBarChart2,
+  FiTrendingUp,
+  FiAward,
+  FiGift,
+  FiFileText
+} from "react-icons/fi";
 
 export default function Sidebar() {
   const location = useLocation();
   const [hoveredItem, setHoveredItem] = useState(null);
 
   const menuItems = [
-    { path: "/", icon: "🏠", label: "Dashboard" },
-     { path: "/manage-routes", icon: "🗺️", label: "Manage Routes" },
-    { path: "/add-agent", icon: "👨‍💼", label: "Add Agent" },
-    { path: "/view-agents", icon: "👥", label: "View Agents" },
-    { path: "/view-customers", icon: "👥", label: "View Customers" },
-    { path: "/transactions", icon: "💳", label: "Transactions" },
-    { path: "/daily-collections", icon: "📅", label: "Daily Collections" },
-    { path: "/weekly-collections", icon: "📊", label: "Weekly Collections" },
-    { path: "/monthly-collections", icon: "📈", label: "Monthly Collections" },
-    { path: "/year-end-bonus", icon: "🎁", label: "Year-End Bonus" },
-    { path: "/gift-distribution", icon: "🎁", label: "Gift Distribution" },
-    { path: "/reports", icon: "📋", label: "Reports" },
+    { path: "/", Icon: FiHome, label: "Dashboard" },
+    { path: "/manage-routes", Icon: FiMap, label: "Manage Routes" },
+    { path: "/add-agent", Icon: FiUserPlus, label: "Add Agent" },
+    { path: "/view-agents", Icon: FiUsers, label: "View Agents" },
+    { path: "/view-customers", Icon: FiUser, label: "View Customers" },
+    { path: "/transactions", Icon: FiCreditCard, label: "Transactions" },
+    { path: "/daily-collections", Icon: FiCalendar, label: "Daily Collections" },
+    { path: "/weekly-collections", Icon: FiBarChart2, label: "Weekly Collections" },
+    { path: "/monthly-collections", Icon: FiTrendingUp, label: "Monthly Collections" },
+    { path: "/year-end-bonus", Icon: FiAward, label: "Year-End Bonus" },
+    { path: "/gift-distribution", Icon: FiGift, label: "Gift Distribution" },
+    { path: "/reports", Icon: FiFileText, label: "Reports" }
   ];
 
   return (
@@ -63,12 +77,12 @@ export default function Sidebar() {
           color: "white",
           letterSpacing: "1px",
           textShadow: "0 2px 10px rgba(0,0,0,0.3)"
-        }}>SMART BHISHI</h4>
+        }}>शिवशंभू भिशी </h4>
         <small style={{
           color: "rgba(255,255,255,0.6)",
           fontSize: "0.75rem",
           letterSpacing: "0.5px"
-        }}>Collection Management</small>
+        }}>ग्राहक भेठवस्तू संचयन योजना</small>
       </div>
 
       {/* Navigation Menu */}
@@ -137,7 +151,7 @@ export default function Sidebar() {
                     transition: "all 0.3s ease",
                     zIndex: 1
                   }}>
-                    {item.icon}
+                    <item.Icon size={18} />
                   </span>
                   
                   {/* Label */}

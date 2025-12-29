@@ -58,7 +58,7 @@ export default function ManageRoutes() {
     try {
       const routesRef = ref(db, 'routes');
       const newRouteRef = push(routesRef);
-      
+
       await set(newRouteRef, {
         name: newRoute.trim(),
         createdAt: new Date().toISOString(),
@@ -122,13 +122,13 @@ export default function ManageRoutes() {
       const updatedVillages = [...existingVillages, newVillage.trim()];
       const routeRef = ref(db, `routes/${selectedRoute.id}/villages`);
       await set(routeRef, updatedVillages);
-      
+
       // Update the selected route in state
       setSelectedRoute({
         ...selectedRoute,
         villages: updatedVillages
       });
-      
+
       setNewVillage("");
     } catch (error) {
       console.error("Error adding village:", error);
@@ -146,13 +146,13 @@ export default function ManageRoutes() {
       const updatedVillages = existingVillages.filter(village => village !== villageToDelete);
       const routeRef = ref(db, `routes/${selectedRoute.id}/villages`);
       await set(routeRef, updatedVillages);
-      
+
       // Update the selected route in state
       setSelectedRoute({
         ...selectedRoute,
         villages: updatedVillages
       });
-      
+
     } catch (error) {
       console.error("Error deleting village:", error);
       alert("Error deleting village: " + error.message);
@@ -162,27 +162,46 @@ export default function ManageRoutes() {
   const filteredRoutes = routes.filter(route =>
     route.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
   return (
     <div className="container-fluid px-4 py-3">
+      <style>{`
+        .mr-header { display:flex; justify-content:space-between; align-items:center; gap:16px }
+        .mr-count { font-weight:600; color:#0d6efd }
+        .mr-card { border-radius:8px; box-shadow:0 1px 6px rgba(34,41,47,0.06); border:1px solid rgba(34,41,47,0.06); background:#fff; position: relative; }
+        .mr-card .card-header { background:#fff; border-bottom:0; padding:12px 16px; color: #1f2937 }
+        .mr-card .card-header h5 { color: inherit; margin:0 }
+        .mr-list-item { padding:14px 16px; border-bottom:1px solid #f1f3f5 }
+        .mr-list-item:last-child { border-bottom:0 }
+        .mr-small { color:#6c757d; font-size:0.9rem }
+        .mr-modal-overlay { position:absolute; inset:0; background:rgba(255,255,255,0.8); display:flex; align-items:center; justify-content:center; z-index:10; border-radius:8px; backdrop-filter: blur(1px); }
+        .mr-modal { width:95%; max-width:480px; background:#fff; border-radius:12px; overflow:hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.1); border: 1px solid rgba(0,0,0,0.05); }
+        .mr-modal-header { padding: 16px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .mr-modal-body { padding: 20px; }
+        .mr-add-btn { background: linear-gradient(90deg, #8b5cf6, #a78bfa); border: none; font-weight: 600; color: white; padding: 0 24px; }
+        .mr-add-btn:hover { background: linear-gradient(90deg, #7c3aed, #8b5cf6); color: white; }
+        .mr-village-list { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; margin-top: 16px; }
+        .mr-village-item { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: #fff; }
+        .mr-village-item:last-child { border-bottom: none; }
+        .mr-actions .btn { min-width:46px }
+        @media(max-width:767px){ .mr-header{flex-direction:column;align-items:flex-start} }
+      `}</style>
       {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
+      <div className="mr-header mb-4">
         <div>
           <h2 className="mb-1 fw-bold text-primary">Route Management</h2>
           <p className="text-muted">Manage collection routes and their associated villages</p>
         </div>
-        <div className="bg-light rounded-pill px-3 py-2 d-flex align-items-center">
-          <FiMapPin className="me-2 text-primary" />
-          <span className="fw-bold">{routes.length}</span>
-          <span className="ms-1 text-muted">Routes</span>
+        <div className="mr-count d-flex align-items-center">
+          <FiMapPin className="me-2" />
+          <span>{routes.length} Routes</span>
         </div>
       </div>
 
       <div className="row g-4">
         {/* Add Route Card */}
         <div className="col-lg-4">
-          <div className="card h-100 border-0 shadow-sm">
-            <div className="card-header bg-white border-0 py-3">
+          <div className="card h-100 mr-card">
+            <div className="card-header py-3">
               <h5 className="mb-0 fw-semibold">
                 <FiPlus className="me-2" /> Add New Route
               </h5>
@@ -199,7 +218,7 @@ export default function ManageRoutes() {
                     placeholder="E.g., North Route"
                     onKeyPress={(e) => e.key === 'Enter' && handleAddRoute()}
                   />
-                  <button 
+                  <button
                     className="btn btn-primary px-4"
                     onClick={handleAddRoute}
                     disabled={!newRoute.trim()}
@@ -215,8 +234,8 @@ export default function ManageRoutes() {
 
         {/* Routes List */}
         <div className="col-lg-8">
-          <div className="card border-0 shadow-sm h-100">
-            <div className="card-header bg-white border-0 py-3">
+          <div className="card h-100 mr-card">
+            <div className="card-header py-3">
               <div className="d-flex justify-content-between align-items-center">
                 <h5 className="mb-0 fw-semibold">All Routes</h5>
                 <div className="w-50">
@@ -232,7 +251,7 @@ export default function ManageRoutes() {
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                     {searchTerm && (
-                      <button 
+                      <button
                         className="btn btn-outline-secondary"
                         onClick={() => setSearchTerm('')}
                         type="button"
@@ -256,40 +275,17 @@ export default function ManageRoutes() {
                   {searchTerm ? 'No matching routes found' : 'No routes added yet'}
                 </div>
               ) : (
-                <div className="list-group list-group-flush">
+                <div>
                   {filteredRoutes.map((route) => (
-                    <div 
-                      key={route.id} 
-                      className="list-group-item list-group-item-action p-3 border-0 border-bottom"
-                    >
+                    <div key={route.id} className="mr-list-item">
                       <div className="d-flex justify-content-between align-items-center">
                         <div>
                           <h6 className="mb-1 fw-semibold">{route.name}</h6>
-                          <small className="text-muted">
-                            {route.villages?.length || 0} villages • 
-                            {route.status === 'active' ? (
-                              <span className="text-success">Active</span>
-                            ) : (
-                              <span className="text-danger">Inactive</span>
-                            )}
-                          </small>
+                          <div className="mr-small">{route.villages?.length || 0} villages • {route.status === 'active' ? <span className="text-success">Active</span> : <span className="text-danger">Inactive</span>}</div>
                         </div>
-                        <div className="btn-group">
-                          <button 
-                            className="btn btn-sm btn-outline-primary"
-                            onClick={() => handleManageVillages(route)}
-                            type="button"
-                          >
-                            <FiEdit size={16} className="me-1" />
-                            Manage Villages
-                          </button>
-                          <button 
-                            className="btn btn-sm btn-outline-danger"
-                            onClick={() => handleDeleteRoute(route.id, route.name)}
-                            type="button"
-                          >
-                            <FiTrash2 size={16} />
-                          </button>
+                        <div className="mr-actions btn-group">
+                          <button className="btn btn-sm btn-outline-primary" onClick={() => handleManageVillages(route)} type="button"><FiEdit size={16} /></button>
+                          <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteRoute(route.id, route.name)} type="button"><FiTrash2 size={16} /></button>
                         </div>
                       </div>
                     </div>
@@ -297,83 +293,56 @@ export default function ManageRoutes() {
                 </div>
               )}
             </div>
+            {/* Village Management Modal (Exact Design Match) */}
+            {showVillageModal && selectedRoute && (
+              <div className="mr-modal-overlay" onClick={() => setShowVillageModal(false)}>
+                <div className="mr-modal" onClick={(e) => e.stopPropagation()}>
+                  <div className="mr-modal-header">
+                    <h5 className="mb-0 fw-bold text-dark d-flex align-items-center">
+                      <FiMapPin className="me-2 text-primary" style={{ strokeWidth: 2.5 }} />
+                      {selectedRoute.name}
+                    </h5>
+                    <button type="button" className="btn-close" onClick={() => setShowVillageModal(false)} aria-label="Close" style={{ opacity: 0.5 }}></button>
+                  </div>
+                  <div className="mr-modal-body">
+                    <div className="input-group mb-0">
+                      <input
+                        type="text"
+                        className="form-control form-control-lg border-end-0"
+                        placeholder="Add village..."
+                        style={{ fontSize: '1rem', padding: '10px 16px', borderColor: '#dee2e6' }}
+                        value={newVillage}
+                        onChange={(e) => setNewVillage(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleAddVillage()}
+                      />
+                      <button className="btn mr-add-btn" onClick={handleAddVillage} disabled={!newVillage.trim()} type="button">
+                        <FiPlus className="me-1" strokeWidth={3} /> ADD
+                      </button>
+                    </div>
+
+                    <div className="mr-village-list">
+                      {selectedRoute.villages?.length > 0 ? (
+                        selectedRoute.villages.map((village, index) => (
+                          <div key={index} className="mr-village-item">
+                            <span className="text-dark fw-medium">{village}</span>
+                            <button className="btn btn-link text-danger p-0 border-0" onClick={() => handleDeleteVillage(village)} type="button">
+                              <FiTrash2 size={18} />
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="mr-village-item justify-content-center text-muted">
+                          No villages added yet
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
-
-      {/* Village Management Modal */}
-      {showVillageModal && selectedRoute && (
-        <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title fw-semibold">
-                  <FiMapPin className="me-2" />
-                  {selectedRoute.name} - Villages
-                </h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
-                  onClick={() => setShowVillageModal(false)}
-                  aria-label="Close"
-                ></button>
-              </div>
-              <div className="modal-body">
-                <div className="mb-3">
-                  <div className="input-group">
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Add new village"
-                      value={newVillage}
-                      onChange={(e) => setNewVillage(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleAddVillage()}
-                    />
-                    <button 
-                      className="btn btn-primary"
-                      onClick={handleAddVillage}
-                      disabled={!newVillage.trim()}
-                      type="button"
-                    >
-                      <FiPlus className="me-1" /> Add
-                    </button>
-                  </div>
-                </div>
-
-                {selectedRoute.villages?.length > 0 ? (
-                  <div className="list-group">
-                    {selectedRoute.villages.map((village, index) => (
-                      <div key={index} className="list-group-item d-flex justify-content-between align-items-center">
-                        <span>{village}</span>
-                        <button
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => handleDeleteVillage(village)}
-                          type="button"
-                        >
-                          <FiTrash2 size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-muted">
-                    No villages added yet. Start by adding a village above.
-                  </div>
-                )}
-              </div>
-              <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-outline-secondary"
-                  onClick={() => setShowVillageModal(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

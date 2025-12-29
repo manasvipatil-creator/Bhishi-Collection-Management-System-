@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
 import { ref, onValue, remove } from "firebase/database";
+import { FiUsers, FiUser, FiUserCheck, FiSearch, FiPlus, FiEye, FiEdit2, FiTrash2, FiMapPin, FiCheckCircle, FiXCircle, FiUserPlus } from 'react-icons/fi';
 
 export default function ViewAgents() {
   const navigate = useNavigate();
@@ -33,19 +34,29 @@ export default function ViewAgents() {
         const agentsArray = Object.entries(data).map(([key, value]) => {
           const customers = value.customers || {};
           const customersArray = Object.values(customers);
-          
+
           // Calculate dynamic statistics from customer data
           const totalCustomers = customersArray.length;
           const activeCustomers = customersArray.filter(c => c.active === true).length;
-          
-          // Calculate total collections from all customer principal amounts
-          const totalCollections = customersArray.reduce((sum, customer) => {
-            return sum + Number(customer.principalAmount || 0);
-          }, 0);
-          
+
+          // Calculate total collections from transactions
+          let totalCollections = 0;
+          const agentTransactions = value.transactions || {};
+
+          Object.values(agentTransactions).forEach(customerTxns => {
+            if (customerTxns) {
+              Object.values(customerTxns).forEach(txn => {
+                const type = txn.type || 'deposit';
+                if (type === 'deposit') {
+                  totalCollections += Number(txn.amount || txn.amountDeposited || 0);
+                }
+              });
+            }
+          });
+
           // Calculate commission (assuming 2% of total collections)
           const totalCommission = totalCollections * 0.02;
-          
+
           // Normalize routes to ensure they're always in the correct format
           let routes = value.agentInfo?.routes || (value.agentInfo?.route ? [value.agentInfo.route] : []);
           // Ensure routes is always an array
@@ -59,7 +70,7 @@ export default function ViewAgents() {
             }
             return route;
           });
-          
+
           return {
             id: key,
             agentName: value.agentInfo?.agentName,
@@ -125,62 +136,101 @@ export default function ViewAgents() {
 
   return (
     <div className="container-fluid fade-in-up">
-      {/* Header */}
-      <div className="card border-0 mb-4" style={{ background: 'var(--primary-gradient)', color: 'white' }}>
-        <div className="card-body p-4">
-          <div className="d-flex align-items-center">
-            <div className="me-3">
-              <div className="rounded-circle d-flex align-items-center justify-content-center"
-                   style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.2)' }}>
-                <span style={{ fontSize: '1.5rem' }}>👥</span>
-              </div>
-            </div>
-            <div>
-              <h4 className="mb-1 fw-bold">All Agents</h4>
-              <p className="mb-0 opacity-75">Manage and monitor all collection agents</p>
-            </div>
-          </div>
+      <style>{`
+        /* ViewAgents - simple & professional (scoped) */
+        .va-header { display:flex; gap:14px; align-items:center; padding:14px; background:#ffffff; border:1px solid #e8eef6; border-radius:8px; margin-bottom:18px }
+        .va-avatar { width:52px; height:52px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:#f1f6ff; color:#0d6efd; font-size:1.25rem }
+        .va-title { margin:0 }
+        .va-sub { margin:0; color:#6b7280; font-size:0.95rem }
+
+        .va-stats { margin-bottom:16px }
+        .va-stat { background:#fff; border:1px solid #eef2f6; border-radius:8px; padding:12px; text-align:left; display:flex; gap:12px; align-items:center }
+        .va-stat-icon { width:44px; height:44px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:white }
+        .va-stat-number { font-weight:700; font-size:1.2rem }
+        .va-stat-label { color:#6b7280; font-size:0.85rem }
+
+        .search-actions .input-group-text { background:#fff; border-right:0 }
+        .search-actions .form-control { border-left:0 }
+
+        .route-badge { background:#f1f5f9; border:1px solid #e2e8f0; color:#0f172a; border-radius:6px; padding:6px 8px; display:inline-block }
+
+        .actions .btn { min-width:40px }
+
+        .modal-backdrop-custom { background-color: rgba(0,0,0,0.45) }
+
+        /* Modal Styling to match design */
+        .va-modal-content { border:none; border-radius:12px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25) }
+        .va-modal-header { padding:20px 24px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center; background:#fff }
+        .va-modal-title { font-size:1.25rem; font-weight:600; color:#111827; margin:0; display:flex; align-items:center; gap:10px }
+        
+        .va-info-card { border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; height:100%; background:#fff }
+        .va-card-header-purple { background: linear-gradient(90deg, #7c3aed, #8b5cf6); padding:12px 20px; color:white; font-weight:600; font-size:1rem; display:flex; align-items:center; gap:8px }
+        
+        .va-detail-row { margin-bottom:12px; font-size:0.95rem }
+        .va-label { font-weight:700; color:#374151; margin-right:6px }
+        .va-value { color:#111827 }
+        
+        .va-route-block { background:#3b82f6; border-radius:6px; padding:12px 16px; margin-bottom:10px; color:white }
+        .va-route-header { font-weight:700; display:flex; align-items:center; gap:8px; margin-bottom:4px; font-size:1rem }
+        .va-route-villages { font-size:0.85rem; opacity:0.95; line-height:1.4 }
+        
+        .va-modal-footer { padding:20px 24px; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:12px; background:#f9fafb }
+        .btn-green { background:#10b981; border:none; color:white; padding:8px 20px; font-weight:600; border-radius:6px }
+        .btn-green:hover { background:#059669 }
+        .btn-grey { background:#6b7280; border:none; color:white; padding:8px 20px; font-weight:600; border-radius:6px }
+        .btn-grey:hover { background:#4b5563 }
+
+        @media (max-width:991px){ .modal-cards{flex-direction:column} }
+        @media (max-width:767px){ .va-header{flex-direction:column;align-items:flex-start} }
+      `}</style>
+
+      {/* Header (simple) */}
+      <div className="va-header">
+        <div className="va-avatar"><FiUsers size={22} /></div>
+        <div>
+          <h4 className="va-title">All Agents</h4>
+          <p className="va-sub">Manage and monitor all collection agents</p>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="row mb-4">
+      <div className="row g-3 mb-4 va-stats">
         <div className="col-md-4">
-          <div className="stats-card">
-            <div className="stats-icon" style={{ background: 'var(--primary-gradient)' }}>
-              👥
+          <div className="va-stat">
+            <div className="va-stat-icon" style={{ background: '#0d6efd' }}><FiUsers /></div>
+            <div>
+              <div className="va-stat-number">{totalAgents}</div>
+              <div className="va-stat-label">Total Agents</div>
             </div>
-            <h3 className="stats-number">{totalAgents}</h3>
-            <p className="stats-label">Total Agents</p>
           </div>
         </div>
         <div className="col-md-4">
-          <div className="stats-card">
-            <div className="stats-icon" style={{ background: 'var(--success-gradient)' }}>
-              ✅
+          <div className="va-stat">
+            <div className="va-stat-icon" style={{ background: '#198754' }}><FiUserCheck /></div>
+            <div>
+              <div className="va-stat-number">{activeAgents}</div>
+              <div className="va-stat-label">Active Agents</div>
             </div>
-            <h3 className="stats-number">{activeAgents}</h3>
-            <p className="stats-label">Active Agents</p>
           </div>
         </div>
         <div className="col-md-4">
-          <div className="stats-card">
-            <div className="stats-icon" style={{ background: 'var(--warning-gradient)' }}>
-              👥
+          <div className="va-stat">
+            <div className="va-stat-icon" style={{ background: '#f59e0b' }}><FiUser /></div>
+            <div>
+              <div className="va-stat-number">{totalCustomers}</div>
+              <div className="va-stat-label">Total Customers</div>
             </div>
-            <h3 className="stats-number">{totalCustomers}</h3>
-            <p className="stats-label">Total Customers</p>
           </div>
         </div>
       </div>
 
       {/* Search and Actions */}
-      <div className="card mb-4">
+      <div className="card mb-4 search-actions">
         <div className="card-body">
           <div className="row align-items-center">
-            <div className="col-md-6">
+            <div className="col-md-6 mb-2 mb-md-0">
               <div className="input-group">
-                <span className="input-group-text">🔍</span>
+                <span className="input-group-text"><FiSearch /></span>
                 <input
                   type="text"
                   className="form-control"
@@ -190,10 +240,10 @@ export default function ViewAgents() {
                 />
               </div>
             </div>
-            <div className="col-md-6 text-end">
-              <span className="badge bg-info me-2">{filteredAgents.length} agents found</span>
-              <button className="btn btn-primary" onClick={() => window.location.href = '/add-agent'}>
-                <span className="me-2">➕</span>Add Agent
+            <div className="col-md-6 text-md-end">
+              <span className="badge bg-light text-dark me-2">{filteredAgents.length} agents</span>
+              <button className="btn btn-primary" onClick={() => navigate('/add-agent')}>
+                <FiPlus className="me-1" /> Add Agent
               </button>
             </div>
           </div>
@@ -226,14 +276,14 @@ export default function ViewAgents() {
                     <tr>
                       <td colSpan="6" className="text-center py-5">
                         <div className="text-muted">
-                          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>👨‍💼</div>
+                          <FiUsers size={48} className="mb-3 text-secondary" />
                           <h5>No agents found</h5>
                           <p>Start by adding your first agent to the system.</p>
-                          <button 
+                          <button
                             className="btn btn-primary mt-2"
                             onClick={() => window.location.href = '/add-agent'}
                           >
-                            <span className="me-2">➕</span>Add First Agent
+                            <FiUserPlus className="me-2" />Add First Agent
                           </button>
                         </div>
                       </td>
@@ -244,8 +294,8 @@ export default function ViewAgents() {
                         <td className="fw-semibold">
                           <div className="d-flex align-items-center">
                             <div className="rounded-circle me-2 d-flex align-items-center justify-content-center"
-                                 style={{ width: '35px', height: '35px', background: 'var(--primary-gradient)', color: 'white', fontSize: '0.8rem' }}>
-                              👨‍💼
+                              style={{ width: '35px', height: '35px', background: 'var(--primary-gradient)', color: 'white', fontSize: '0.8rem' }}>
+                              <FiUsers size={16} />
                             </div>
                             {agent.agentName}
                           </div>
@@ -258,10 +308,10 @@ export default function ViewAgents() {
                             <div className="d-flex flex-wrap gap-1">
                               {agent.routes.map((route, idx) => {
                                 const villages = routesData[route] || [];
-                                
+
                                 return (
-                                  <span key={idx} className="badge bg-info" title={villages.length > 0 ? villages.join(', ') : ''}>
-                                    📍 {route}
+                                  <span key={idx} className="route-badge me-1" title={villages.length > 0 ? villages.join(', ') : ''}>
+                                    <FiMapPin className="me-1" /> {route}
                                     {villages.length > 0 && (
                                       <small className="d-block" style={{ fontSize: '0.7rem', opacity: 0.9 }}>
                                         ({villages.length} villages)
@@ -277,32 +327,28 @@ export default function ViewAgents() {
                         </td>
                         <td className="fw-bold">{agent.totalCustomers || 0}</td>
                         <td>
-                          <span className={`badge ${agent.status === 'active' ? 'bg-success' : 'bg-danger'}`}>
-                            {agent.status === 'active' ? '✅ Active' : '❌ Inactive'}
+                          <span className={`badge d-inline-flex align-items-center gap-1 ${agent.status === 'active' ? 'bg-success' : 'bg-danger'}`}>
+                            {agent.status === 'active' ? (
+                              <>
+                                <FiCheckCircle size={14} /> Active
+                              </>
+                            ) : (
+                              <>
+                                <FiXCircle size={14} /> Inactive
+                              </>
+                            )}
                           </span>
                         </td>
                         <td>
-                          <div className="btn-group btn-group-sm">
-                            <button 
-                              className="btn btn-outline-info" 
-                              title="View Details"
-                              onClick={() => handleViewAgent(agent)}
-                            >
-                              👁️
+                          <div className="btn-group btn-group-sm actions">
+                            <button className="btn btn-outline-secondary" title="View Details" onClick={() => handleViewAgent(agent)}>
+                              <FiEye />
                             </button>
-                            <button 
-                              className="btn btn-outline-warning" 
-                              title="Edit Agent"
-                              onClick={() => handleEditAgent(agent)}
-                            >
-                              ✏️
+                            <button className="btn btn-outline-secondary" title="Edit Agent" onClick={() => handleEditAgent(agent)}>
+                              <FiEdit2 />
                             </button>
-                            <button 
-                              className="btn btn-outline-danger" 
-                              title="Delete Agent"
-                              onClick={() => handleDeleteAgent(agent)}
-                            >
-                              🗑️
+                            <button className="btn btn-outline-danger" title="Delete Agent" onClick={() => handleDeleteAgent(agent)}>
+                              <FiTrash2 />
                             </button>
                           </div>
                         </td>
@@ -316,92 +362,112 @@ export default function ViewAgents() {
         </div>
       </div>
 
-      {/* Agent Details Modal */}
+      {/* Agent Details Modal - Redesigned */}
       {showModal && selectedAgent && (
-        <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header" style={{ background: 'var(--primary-gradient)', color: 'white' }}>
-                <h5 className="modal-title">
-                  <span className="me-2">👨‍💼</span>
-                  Agent Details - {selectedAgent.agentName}
+        <div className="modal fade show" style={{ display: 'block' }}>
+          <div className="modal-backdrop-custom" style={{ position: 'fixed', inset: 0, zIndex: 1040, backgroundColor: 'rgba(0,0,0,0.45)' }} onClick={() => setShowModal(false)}></div>
+          <div className="modal-dialog modal-lg modal-dialog-centered" style={{ zIndex: 1050 }}>
+            <div className="modal-content va-modal-content">
+              {/* Modal Header */}
+              <div className="va-modal-header">
+                <h5 className="va-modal-title">
+                  <FiUsers className="me-2" /> Agent Details - {selectedAgent.agentName}
                 </h5>
-                <button 
-                  type="button" 
-                  className="btn-close btn-close-white" 
-                  onClick={() => setShowModal(false)}
-                ></button>
+                <button type="button" className="btn-close" onClick={() => setShowModal(false)} aria-label="Close"></button>
               </div>
-              <div className="modal-body">
-                <div className="row">
+
+              {/* Modal Body */}
+              <div className="modal-body p-4">
+                <div className="row g-4">
+                  {/* Basic Information Column */}
                   <div className="col-md-6">
-                    <div className="card mb-3">
-                      <div className="card-header">
-                        <h6 className="mb-0">📋 Basic Information</h6>
+                    <div className="va-info-card">
+                      <div className="va-card-header-purple">
+                        <FiUsers size={18} /> Basic Information
                       </div>
-                      <div className="card-body">
-                        <p><strong>Agent Name:</strong> {selectedAgent.agentName}</p>
-                        <p><strong>Mobile Number:</strong> {selectedAgent.mobileNumber}</p>
-                        <p><strong>Routes:</strong> 
+                      <div className="p-4">
+                        <div className="va-detail-row">
+                          <span className="va-label">Agent Name:</span>
+                          <span className="va-value">{selectedAgent.agentName}</span>
+                        </div>
+                        <div className="va-detail-row mb-4">
+                          <span className="va-label">Mobile Number:</span>
+                          <span className="va-value">{selectedAgent.mobileNumber}</span>
+                        </div>
+
+                        <div className="mb-2 fb-bold fw-bold text-dark mb-2">Routes:</div>
+                        <div className="mb-4">
                           {selectedAgent.routes && selectedAgent.routes.length > 0 ? (
-                            <div className="d-flex flex-wrap gap-1 mt-1">
-                              {selectedAgent.routes.map((route, idx) => {
-                                const villages = routesData[route] || [];
-                                
-                                return (
-                                  <div key={idx} className="badge bg-info p-2">
-                                    <div>📍 {route}</div>
-                                    {villages.length > 0 && (
-                                      <small className="d-block mt-1" style={{ fontSize: '0.7rem', opacity: 0.9 }}>
-                                        Villages: {villages.join(', ')}
-                                      </small>
-                                    )}
+                            selectedAgent.routes.map((route, idx) => {
+                              const villages = routesData[route] || [];
+                              return (
+                                <div key={idx} className="va-route-block">
+                                  <div className="va-route-header">
+                                    <FiMapPin size={16} /> {route}
                                   </div>
-                                );
-                              })}
-                            </div>
+                                  {villages.length > 0 && (
+                                    <div className="va-route-villages">
+                                      Villages: {villages.join(', ')}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })
                           ) : (
-                            <span className="text-muted"> No routes assigned</span>
+                            <div className="text-muted small fst-italic">No routes assigned</div>
                           )}
-                        </p>
-                        <p><strong>Status:</strong> 
-                          <span className={`badge ms-2 ${selectedAgent.status === 'active' ? 'bg-success' : 'bg-danger'}`}>
-                            {selectedAgent.status === 'active' ? '✅ Active' : '❌ Inactive'}
+                        </div>
+
+                        <div className="va-detail-row">
+                          <span className="va-label">Status:</span>
+                          <span className={`badge rounded-pill ${selectedAgent.status === 'active' ? 'bg-success' : 'bg-danger'}`}>
+                            {selectedAgent.status === 'active' ? 'Active' : 'Inactive'}
                           </span>
-                        </p>
-                        <p><strong>Created:</strong> {selectedAgent.createdAt ? new Date(selectedAgent.createdAt).toLocaleDateString() : 'N/A'}</p>
+                        </div>
+                        <div className="va-detail-row mt-2">
+                          <span className="va-label">Created:</span>
+                          <span className="va-value">{selectedAgent.createdAt ? new Date(selectedAgent.createdAt).toLocaleDateString() : 'N/A'}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
+
+                  {/* Statistics Column */}
                   <div className="col-md-6">
-                    <div className="card mb-3">
-                      <div className="card-header">
-                        <h6 className="mb-0">📊 Statistics</h6>
+                    <div className="va-info-card">
+                      <div className="va-card-header-purple">
+                        <FiUsers size={18} /> Statistics
                       </div>
-                      <div className="card-body">
-                        <p><strong>Total Customers:</strong> {selectedAgent.totalCustomers || 0}</p>
-                        <p><strong>Active Customers:</strong> {selectedAgent.activeCustomers || 0}</p>
-                        <p><strong>Total Collections:</strong> ₹{(selectedAgent.totalCollections || 0).toLocaleString()}</p>
-                        <p><strong>Total Commission:</strong> ₹{(selectedAgent.totalCommission || 0).toLocaleString()}</p>
+                      <div className="p-4">
+                        <div className="va-detail-row mb-3">
+                          <span className="va-label">Total Customers:</span>
+                          <span className="va-value">{selectedAgent.totalCustomers || 0}</span>
+                        </div>
+                        <div className="va-detail-row mb-3">
+                          <span className="va-label">Active Customers:</span>
+                          <span className="va-value">{selectedAgent.activeCustomers || 0}</span>
+                        </div>
+                        <div className="va-detail-row mb-3">
+                          <span className="va-label">Total Collections:</span>
+                          <span className="va-value">₹{(selectedAgent.totalCollections || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="va-detail-row">
+                          <span className="va-label">Total Commission:</span>
+                          <span className="va-value">₹{(selectedAgent.totalCommission || 0).toLocaleString()}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-warning"
-                  onClick={() => handleEditAgent(selectedAgent)}
-                >
-                  ✏️ Edit Agent
+
+              {/* Modal Footer */}
+              <div className="va-modal-footer">
+                <button type="button" className="btn-green" onClick={() => handleEditAgent(selectedAgent)}>
+                  <FiEdit2 className="me-1" /> EDIT AGENT
                 </button>
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={() => setShowModal(false)}
-                >
-                  Close
+                <button type="button" className="btn-grey" onClick={() => setShowModal(false)}>
+                  CLOSE
                 </button>
               </div>
             </div>
