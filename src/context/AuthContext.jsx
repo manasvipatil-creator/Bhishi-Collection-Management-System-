@@ -11,17 +11,17 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  // Check if user is logged in on mount
-  useEffect(() => {
-    const storedUser = localStorage.getItem("adminUser");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+  // Initialize state synchronously from localStorage to prevent flickering
+  const [user, setUser] = useState(() => {
+    try {
+      const storedUser = localStorage.getItem("adminUser");
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (error) {
+      console.error("Error parsing user from localStorage:", error);
+      return null;
     }
-    setLoading(false);
-  }, []);
+  });
+  const [loading, setLoading] = useState(false);
 
   const login = (userData) => {
     setUser(userData);

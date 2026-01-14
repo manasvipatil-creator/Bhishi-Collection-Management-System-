@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
@@ -45,7 +45,7 @@ function App() {
           <Route path="/setup-admin" element={<SetupAdmin />} />
           <Route path="/agent-login" element={<AgentLogin />} />
           <Route path="/agent-dashboard" element={<AgentDashboard />} />
-          
+
           <Route path="/*" element={
             <ProtectedRoute>
               <div className="d-flex">

@@ -260,12 +260,13 @@ export const addTransactionToAgent = async (agentPhone, transactionData) => {
               const customerSnapshot = await get(customerRef);
               const customer = customerSnapshot.exists() ? customerSnapshot.val() : {};
 
+              // Use the updated balance (after withdrawal) for the notification
               await sendWithdrawalNotification({
                 customerPhone: transactionData.customerPhone,
                 customerName: transactionData.customerName || customer.name,
                 amount: transaction.amount,
                 accountNumber: transactionData.accountNumber || customer.accountNumber || 'N/A',
-                totalAmount: updates.balance, // Show NET BALANCE after withdrawal
+                totalAmount: updates.balance, // Show balance after withdrawal
                 agentName: agent?.name || 'Agent'
               });
             } catch (notifError) {
@@ -435,8 +436,13 @@ export const getAllTransactions = async () => {
 
           if (transactions && typeof transactions === 'object') {
             // Get customer details from agent's customers
-            const customerData = agent.customers ?
-              Object.values(agent.customers).find(c => c.phone === customerPhone) : null;
+            let customerData = null;
+            if (agent.customers) {
+              customerData = Object.values(agent.customers).find(c => c.phone === customerPhone || c.phoneNumber === customerPhone);
+              if (!customerData && agent.customers[customerPhone]) {
+                customerData = agent.customers[customerPhone];
+              }
+            }
 
             console.log(`Customer data for ${customerPhone}:`, customerData);
 
@@ -488,7 +494,11 @@ export const getAllTransactions = async () => {
 
           for (const agent of agents) {
             if (agent.customers) {
-              const customer = Object.values(agent.customers).find(c => c.phone === customerPhone);
+              let customer = Object.values(agent.customers).find(c => c.phone === customerPhone || c.phoneNumber === customerPhone);
+              if (!customer && agent.customers[customerPhone]) {
+                customer = agent.customers[customerPhone];
+              }
+
               if (customer) {
                 agentData = agent;
                 customerData = customer;
@@ -1257,21 +1267,7 @@ export const processEarlyWithdrawal = async (agentPhone, customerPhone, withdraw
       date: additionalData.date || new Date().toISOString().split('T')[0]
     });
 
-    // Send WhatsApp notification for withdrawal
-    try {
-      const agent = await getAgentById(agentPhone);
-
-      await sendWithdrawalNotification({
-        customerPhone: customerPhone,
-        customerName: additionalData.customerName || 'Customer',
-        amount: penaltyInfo.netAmount,
-        accountNumber: additionalData.accountNumber || 'N/A',
-        totalAmount: 0, // After withdrawal, balance is 0
-        agentName: agent?.name || 'Agent'
-      });
-    } catch (notifError) {
-      console.error("WhatsApp notification failed (non-critical):", notifError);
-    }
+    // Notification is handled in addTransactionToAgent
 
     return {
       success: true,

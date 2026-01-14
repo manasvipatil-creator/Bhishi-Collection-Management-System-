@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getAllEligibleCustomers, addTransactionToAgent } from "../utils/databaseHelpers";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import "./YearEndBonus.css";
 
 export default function YearEndBonus() {
@@ -79,6 +81,108 @@ export default function YearEndBonus() {
     }
   };
 
+  const downloadPDF = () => {
+    const doc = new jsPDF();
+
+    // Add Business Header
+    doc.setFontSize(22);
+    doc.setTextColor(79, 70, 229); // Primary color
+    doc.text("Bishi Collection Management", 14, 20);
+
+    doc.setFontSize(14);
+    doc.setTextColor(31, 41, 55); // Gray-800
+    doc.text(`Year-End Bonus Report - ${selectedYear}`, 14, 30);
+
+    doc.setFontSize(10);
+    doc.setTextColor(107, 114, 128); // Gray-500
+    doc.text(`Report View: ${statusFilter}`, 14, 38);
+    doc.text(`Generation Date: ${new Date().toLocaleString()}`, 14, 44);
+
+    // Summary of filtered data
+    const filteredCount = filteredCustomers.length;
+    const filteredPayout = filteredCustomers.filter(c => c.totalDeposits >= 12000).length * 1000;
+
+    doc.setTextColor(31, 41, 55); // Gray-800
+    doc.text(`Records in this Report: ${filteredCount}`, 14, 52);
+    doc.text(`Bonus Payout in this Report: Rs. ${filteredPayout.toLocaleString()}`, 14, 58);
+
+    // Prepare table data
+    const tableColumn = [
+      { header: 'Customer Details', dataKey: 'customer' },
+      { header: 'Agent', dataKey: 'agent' },
+      { header: 'Timeline', dataKey: 'timeline' },
+      { header: 'Deposits', dataKey: 'deposits' },
+      { header: '12th Month', dataKey: 'twelfth' },
+      { header: 'Bonus', dataKey: 'bonus' },
+      { header: 'Payout', dataKey: 'payout' },
+      { header: 'Status', dataKey: 'status' }
+    ];
+
+    const tableRows = filteredCustomers.map(customer => {
+      const isFullBonus = customer.totalDeposits >= 12000;
+      return {
+        customer: `${customer.customerName}\n${customer.customerPhone}`,
+        agent: customer.agentName,
+        timeline: `Start: ${customer.startDate}\n${customer.completedMonths}/12 Months`,
+        deposits: `Rs. ${customer.totalDeposits.toLocaleString()}`,
+        twelfth: customer.twelfthMonthStatus.hasMissedPayment ? `Delayed (${customer.twelfthMonthStatus.missedDays}d)` : "On Time",
+        bonus: isFullBonus ? "Rs. 1,000" : "-",
+        payout: `Rs. ${(customer.totalDeposits + (isFullBonus ? 1000 : 0)).toLocaleString()}`,
+        status: isFullBonus ? "Full Bonus" : "In Progress"
+      };
+    });
+
+    // Generate table
+    autoTable(doc, {
+      columns: tableColumn,
+      body: tableRows,
+      startY: 65,
+      theme: 'grid',
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+        valign: 'middle',
+        overflow: 'linebreak'
+      },
+      headStyles: {
+        fillColor: [79, 70, 229],
+        textColor: 255,
+        fontSize: 9,
+        halign: 'center'
+      },
+      columnStyles: {
+        deposits: { halign: 'right' },
+        bonus: { halign: 'right' },
+        payout: { halign: 'right', fontStyle: 'bold' },
+        status: { halign: 'center' },
+        twelfth: { halign: 'center' }
+      },
+      alternateRowStyles: { fillColor: [249, 250, 251] },
+      margin: { top: 65 }
+    });
+
+    // Add footer to each page
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(156, 163, 175);
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        doc.internal.pageSize.width / 2,
+        doc.internal.pageSize.height - 10,
+        { align: 'center' }
+      );
+      doc.text(
+        "© 2025 Bishi Collection Management System",
+        14,
+        doc.internal.pageSize.height - 10
+      );
+    }
+
+    doc.save(`YearEnd_Bonus_${selectedYear}_${statusFilter.replace(/\s+/g, '_')}.pdf`);
+  };
+
   const filteredCustomers = eligibleCustomers.filter(customer => {
     if (statusFilter === 'All Status') return true;
     const isFullBonus = customer.totalDeposits >= 12000;
@@ -88,9 +192,9 @@ export default function YearEndBonus() {
   });
 
   const totalEligibleCustomers = eligibleCustomers.length;
-  const fullBonusCustomers = eligibleCustomers.filter(c => c.bonusAmount === 12000).length;
-  const partialBonusCustomers = eligibleCustomers.filter(c => c.bonusAmount < 12000).length;
-  const totalBonusAmount = eligibleCustomers.reduce((sum, customer) => sum + customer.bonusAmount, 0);
+  const fullBonusCustomers = eligibleCustomers.filter(c => c.totalDeposits >= 12000).length;
+  const partialBonusCustomers = eligibleCustomers.filter(c => c.totalDeposits < 12000).length;
+  const totalBonusAmount = fullBonusCustomers * 1000;
 
   return (
     <div className="yeb-container fade-in-up">
@@ -216,6 +320,14 @@ export default function YearEndBonus() {
             <option value="Full Bonus">✅ Full Bonus</option>
             <option value="In Progress">⏳ In Progress</option>
           </select>
+          <button
+            className="yeb-download-btn"
+            onClick={downloadPDF}
+            disabled={filteredCustomers.length === 0}
+            title="Download current view as PDF"
+          >
+            <span>📥</span> Download PDF
+          </button>
         </div>
         <button
           className="yeb-process-btn"

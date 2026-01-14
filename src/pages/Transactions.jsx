@@ -302,6 +302,7 @@ export default function Transactions() {
                   customerId: value.customerId || customer.id || 0,
                   customerName: customer.name,
                   customerPhone: customer.phone,
+                  agentName: agent.name,
                   timestamp: value.timestamp || (value.depositDate ? new Date(`${value.depositDate} ${value.depositTime || '00:00:00'}`).getTime() : Date.now()),
                   // Keep original data
                   ...value
@@ -327,11 +328,27 @@ export default function Transactions() {
                   customerId: value.customerId || customer.id || 0,
                   customerName: customer.name,
                   customerPhone: customer.phone,
+                  agentName: agent.name,
                   timestamp: value.timestamp || (value.date ? new Date(value.date).getTime() : Date.now()),
                   // Keep original data
                   ...value
                 }));
-                customerTransactions = [...customerTransactions, ...withdrawalTransactions];
+                // Deduplicate: Filter out withdrawals that already exist in the main transactions list
+                // We prefer the transaction from 'agents' (customerTransactions) because it has the generated Receipt Number and full metadata
+                const existingWithdrawals = customerTransactions
+                  .filter(t => t.type === 'withdrawal');
+
+                const uniqueWithdrawals = withdrawalTransactions.filter(w => {
+                  // Check if this withdrawal already exists in the existing list
+                  // We match on Date AND Amount (comparing agentTxn.amount with withdrawalTxn.netAmount)
+                  const isDuplicate = existingWithdrawals.some(existing =>
+                    existing.date === w.date &&
+                    Number(existing.amount) === Number(w.netAmount || w.amount || 0)
+                  );
+                  return !isDuplicate;
+                });
+
+                customerTransactions = [...customerTransactions, ...uniqueWithdrawals];
               }
 
               // Sort by date (newest first)
@@ -903,6 +920,7 @@ export default function Transactions() {
           customerId: value.customerId || customer.id || 0,
           customerName: customer.name,
           customerPhone: customer.phone,
+          agentName: selectedAgent.name,
           // For withdrawal transactions, include additional fields
           requestedAmount: value.requestedAmount || 0,
           actualAmount: value.actualAmount || 0,

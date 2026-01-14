@@ -230,34 +230,7 @@ export default function DailyCollections() {
             ))}
           </select>
         </div>
-        <div className="col-md-3">
-          <label className="form-label">Filter by Customers</label>
-          <div className="d-flex gap-2">
-            <button
-              className="btn btn-outline-primary btn-sm flex-grow-1"
-              onClick={() => setShowCustomerModal(true)}
-            >
-              👥 Select Customers ({selectedCustomers.length})
-            </button>
-            {selectedCustomers.length > 0 && (
-              <button
-                className="btn btn-outline-danger btn-sm"
-                onClick={clearCustomerFilter}
-                title="Clear customer filter"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-          {selectedCustomers.length > 0 && (
-            <div className="mt-1">
-              <small className="text-muted">
-                Showing {selectedCustomers.length} selected customer{selectedCustomers.length > 1 ? 's' : ''}
-              </small>
-            </div>
-          )}
-        </div>
-        <div className="col-md-5">
+        <div className="col-md-8">
           <label className="form-label">Search</label>
           <input
             type="text"
