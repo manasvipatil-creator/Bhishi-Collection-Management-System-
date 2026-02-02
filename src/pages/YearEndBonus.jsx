@@ -213,7 +213,7 @@ export default function YearEndBonus() {
             value={selectedYear}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
           >
-            {[2025, 2024, 2023, 2022, 2021].map(year => (
+            {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i + 1).map(year => (
               <option key={year} value={year}>{year}</option>
             ))}
           </select>

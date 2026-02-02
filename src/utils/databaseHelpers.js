@@ -805,7 +805,9 @@ export const calculateBonusEligibility = async (agentPhone, customerPhone) => {
       };
     }
 
-    const transactions = Object.values(snapshot.val()).filter(t => t.type === "deposit" && t.date);
+    const transactions = Object.values(snapshot.val()).filter(t =>
+      (t.type?.toLowerCase() === "deposit" || !t.type) && t.date
+    );
 
     if (transactions.length === 0) {
       return {
@@ -989,7 +991,8 @@ export const checkTwelfthMonthPayment = async (agentPhone, customerPhone, startD
     const transactions = snapshot.val();
     const twelfthMonthTxns = Object.values(transactions).filter(t => {
       const txnDate = new Date(t.date);
-      return t.type === 'deposit' && txnDate >= twelfthMonthStart && txnDate < twelfthMonthEnd;
+      const type = (t.type || 'deposit').toLowerCase();
+      return type === 'deposit' && txnDate >= twelfthMonthStart && txnDate < twelfthMonthEnd;
     });
 
     const totalPaid = twelfthMonthTxns.reduce((sum, t) => sum + (t.amount || 0), 0);
@@ -1294,9 +1297,12 @@ export const getAllEligibleCustomers = async (filterYear = null) => {
 
           // Filter by year if specified
           if (filterYear) {
-            const startYear = new Date(eligibility.startDate).getFullYear();
-            // Check if customer started in the selected year
-            if (startYear !== filterYear) {
+            const startYear = eligibility.startDate ? new Date(eligibility.startDate).getFullYear() : null;
+            const endYear = eligibility.planEndDate ? new Date(eligibility.planEndDate).getFullYear() : null;
+
+            // Check if customer either started or ends in the selected year
+            // This makes them visible in both batch year and completion year
+            if (startYear !== filterYear && endYear !== filterYear) {
               continue; // Skip this customer
             }
           }
