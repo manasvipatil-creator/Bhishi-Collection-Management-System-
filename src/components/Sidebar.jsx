@@ -188,7 +188,7 @@ export default function Sidebar() {
             color: "rgba(255,255,255,0.5)",
             marginBottom: "8px"
           }}>
-            © 2025 Bishi Collection
+            © 2026 Bishi Collection
           </div>
           <div style={{
             fontSize: "0.7rem",
