@@ -100,11 +100,9 @@ export default function YearEndBonus() {
 
     // Summary of filtered data
     const filteredCount = filteredCustomers.length;
-    const filteredPayout = filteredCustomers.filter(c => c.totalDeposits >= 12000).length * 1000;
 
     doc.setTextColor(31, 41, 55); // Gray-800
     doc.text(`Records in this Report: ${filteredCount}`, 14, 52);
-    doc.text(`Bonus Payout in this Report: Rs. ${filteredPayout.toLocaleString()}`, 14, 58);
 
     // Prepare table data
     const tableColumn = [

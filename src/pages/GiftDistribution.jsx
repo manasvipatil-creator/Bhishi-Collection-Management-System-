@@ -81,10 +81,27 @@ export default function GiftDistribution() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
   const [distributionSummary, setDistributionSummary] = useState(null);
+  const [savedDistributions, setSavedDistributions] = useState([]);
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
+  const [showHistoryDetailModal, setShowHistoryDetailModal] = useState(false);
 
   useEffect(() => {
     loadCustomersAndRoutes();
+    loadSavedDistributions();
   }, []);
+
+  const loadSavedDistributions = async () => {
+    try {
+      const giftRef = ref(db, 'giftDistribution');
+      const snapshot = await get(giftRef);
+      if (snapshot.exists()) {
+        const data = Object.values(snapshot.val());
+        setSavedDistributions(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
+      }
+    } catch (error) {
+      console.error("Error loading saved distributions:", error);
+    }
+  };
 
   const loadCustomersAndRoutes = async () => {
     setLoading(true);
@@ -158,7 +175,7 @@ export default function GiftDistribution() {
           name: routeName,
           customers: customers,
           totalCustomers: customers.length,
-          giftEligibleCount: Math.floor(customers.length / 10),
+          giftEligibleCount: customers.length > 0 ? 1 : 0,
           villages: villageDistribution,
           configuredVillages: routeVillages
         };
@@ -314,6 +331,7 @@ export default function GiftDistribution() {
       });
 
       alert("Saved successfully!");
+      loadSavedDistributions();
     } catch (error) {
       alert("Error saving: " + error.message);
     }
@@ -495,8 +513,8 @@ export default function GiftDistribution() {
                       <td className="fw-semibold">{route.name}</td>
                       <td>{route.totalCustomers}</td>
                       <td>
-                        {route.customers.length < 10 ?
-                          <span className="gd-badge gd-badge-warning">Manual</span> :
+                        {route.customers.length === 0 ?
+                          <span className="gd-badge gd-badge-warning">0</span> :
                           <span className="gd-badge gd-badge-success">{route.giftEligibleCount}</span>
                         }
                       </td>
@@ -646,6 +664,224 @@ export default function GiftDistribution() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Distributions History */}
+      <div className="gd-card mt-4 mb-5">
+        <div className="gd-card-header" style={{ background: '#f8fafc' }}>
+          <div className="gd-card-title">📜 Distribution History (Admin Panel Data)</div>
+        </div>
+        <div className="gd-card-body">
+          <div className="table-responsive">
+            <table className="gd-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Total Recipients</th>
+                  <th>Gold Winners</th>
+                  <th>Year</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {savedDistributions.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="text-center text-muted py-4">No saved distributions yet</td>
+                  </tr>
+                ) : (
+                  savedDistributions.map((dist, idx) => (
+                    <tr key={idx}>
+                      <td>{new Date(dist.date).toLocaleString()}</td>
+                      <td><span className="gd-badge gd-badge-success">{dist.totalRecipients}</span></td>
+                      <td><span className="gd-badge gd-badge-warning">{Object.keys(dist.goldWinners || {}).length} winners</span></td>
+                      <td>{dist.year}</td>
+                      <td>
+                        <button
+                          className="gd-btn gd-btn-secondary"
+                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                          onClick={() => {
+                            setSelectedHistoryItem(dist);
+                            setShowHistoryDetailModal(true);
+                          }}
+                        >
+                          Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {/* History Detail Modal */}
+      {showHistoryDetailModal && selectedHistoryItem && (
+        <div className="gd-modal-overlay">
+          <div className="gd-modal gd-modal-lg">
+            <div className="gd-modal-header" style={{ background: 'var(--primary-color)', color: 'white' }}>
+              <div>
+                <h5 className="m-0">📜 Distribution Details</h5>
+                <small className="opacity-75">{new Date(selectedHistoryItem.date).toLocaleString()}</small>
+              </div>
+              <button className="gd-close-btn text-white" onClick={() => setShowHistoryDetailModal(false)}>×</button>
+            </div>
+            <div className="gd-modal-body">
+              {/* Summary Stats */}
+              <div className="gd-stats-grid mb-4">
+                <div className="gd-stat-card py-2">
+                  <div className="gd-stat-content">
+                    <h3>{selectedHistoryItem.totalRecipients}</h3>
+                    <p>Total Recipients</p>
+                  </div>
+                </div>
+                <div className="gd-stat-card py-2">
+                  <div className="gd-stat-content">
+                    <h3>{Object.keys(selectedHistoryItem.goldWinners || {}).length}</h3>
+                    <p>Gold Winners</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gold Winners List */}
+              <div className="mb-4">
+                <h6 className="fw-bold mb-3">🏆 Gold Winners</h6>
+                <div className="table-responsive">
+                  <table className="gd-table">
+                    <thead>
+                      <tr>
+                        <th>Route</th>
+                        <th>Winner Name</th>
+                        <th>Phone</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(selectedHistoryItem.goldWinners || {}).map(([route, winners], i) => (
+                        <tr key={i}>
+                          <td className="fw-bold">{route}</td>
+                          <td className="text-success">{winners[winners.length - 1]?.name}</td>
+                          <td>{winners[winners.length - 1]?.phone}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Recipients List */}
+              <div>
+                <h6 className="fw-bold mb-3">👥 All Recipients</h6>
+                <div className="gd-scroll-area" style={{ maxHeight: '400px' }}>
+                  <table className="gd-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Type</th>
+                        <th>From</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedHistoryItem.allCustomers?.map((c, i) => (
+                        <tr key={i}>
+                          <td className="fw-bold">{c.name}</td>
+                          <td>{c.phone}</td>
+                          <td>
+                            <span className={`gd-badge ${c.selectionType === 'manual' ? 'gd-badge-warning' : 'gd-badge-success'}`}>
+                              {c.selectionType === 'manual' ? '✋ Manual' : '🎯 Auto'}
+                            </span>
+                          </td>
+                          <td>{c.selectedFromVillage || c.village || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div className="gd-modal-footer no-print">
+              <button className="gd-btn gd-btn-secondary" onClick={() => setShowHistoryDetailModal(false)}>Close</button>
+              <button className="gd-btn gd-btn-primary" onClick={() => window.print()}>🖨️ Print Details</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Professional Printable Template (Hidden in UI) */}
+      {selectedHistoryItem && (
+        <div className="print-area">
+          <div className="print-header">
+            <h1>Bishi Collection Management</h1>
+            <p>Gift Distribution Report</p>
+            <div style={{ marginTop: '10px', fontSize: '10pt' }}>
+              <strong>Date:</strong> {new Date(selectedHistoryItem.date).toLocaleString()} |
+              <strong> Year:</strong> {selectedHistoryItem.year}
+            </div>
+          </div>
+
+          <div className="print-grid">
+            <div className="print-stat-box">
+              <div style={{ fontSize: '18pt', fontWeight: 'bold' }}>{selectedHistoryItem.totalRecipients}</div>
+              <div style={{ fontSize: '10pt', color: '#666' }}>Total Recipients</div>
+            </div>
+            <div className="print-stat-box">
+              <div style={{ fontSize: '18pt', fontWeight: 'bold' }}>{Object.keys(selectedHistoryItem.goldWinners || {}).length}</div>
+              <div style={{ fontSize: '10pt', color: '#666' }}>Gold Winners</div>
+            </div>
+          </div>
+
+          <div className="print-section">
+            <div className="print-section-title">🏆 Gold Winners List</div>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '40%' }}>Route Name</th>
+                  <th style={{ width: '30%' }}>Winner Name</th>
+                  <th style={{ width: '30%' }}>Phone Number</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(selectedHistoryItem.goldWinners || {}).map(([route, winners], i) => (
+                  <tr key={i}>
+                    <td>{route}</td>
+                    <td style={{ fontWeight: 'bold' }}>{winners[winners.length - 1]?.name}</td>
+                    <td>{winners[winners.length - 1]?.phone}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="print-section">
+            <div className="print-section-title">👥 All Gift Recipients</div>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>S.No</th>
+                  <th>Customer Name</th>
+                  <th>Phone Number</th>
+                  <th>Selection Type</th>
+                  <th>Village/Route</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedHistoryItem.allCustomers?.map((c, i) => (
+                  <tr key={i}>
+                    <td>{i + 1}</td>
+                    <td style={{ fontWeight: 'bold' }}>{c.name}</td>
+                    <td>{c.phone}</td>
+                    <td>{c.selectionType === 'manual' ? '✋ Manual' : '🎯 Auto'}</td>
+                    <td>{c.selectedFromVillage || c.village || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="print-footer">
+            Generated on {new Date().toLocaleString()} | Bishi Collection Management System
           </div>
         </div>
       )}

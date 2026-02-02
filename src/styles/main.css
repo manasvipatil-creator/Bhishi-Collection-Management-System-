@@ -6,14 +6,14 @@
   --warning-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
   --danger-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   --dark-gradient: linear-gradient(135deg, #434343 0%, #000000 100%);
-  
+
   --primary-color: #667eea;
   --secondary-color: #764ba2;
   --accent-color: #f093fb;
   --success-color: #4facfe;
   --warning-color: #43e97b;
   --danger-color: #f5576c;
-  
+
   --bg-primary: #f8fafc;
   --bg-secondary: #ffffff;
   --bg-card: #ffffff;
@@ -50,7 +50,8 @@ body {
   flex-grow: 1;
   background: var(--bg-primary);
   min-height: 100vh;
-  margin-left: 260px; /* Match sidebar width */
+  margin-left: 260px;
+  /* Match sidebar width */
 }
 
 /* Sidebar Styles */
@@ -360,6 +361,7 @@ body {
     opacity: 0;
     transform: translateY(30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -375,6 +377,7 @@ body {
     opacity: 0;
     transform: translateX(-30px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -395,15 +398,15 @@ body {
     z-index: 1000;
     transition: left 0.3s ease;
   }
-  
+
   .sidebar.show {
     left: 0;
   }
-  
+
   .main-content {
     margin-left: 0 !important;
   }
-  
+
   .stats-card {
     margin-bottom: 1rem;
   }
@@ -427,8 +430,13 @@ body {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Custom Scrollbar */
@@ -448,6 +456,7 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--secondary-gradient);
 }
+
 /* Cursor Pointer for Clickable Elements */
 .cursor-pointer {
   cursor: pointer;
@@ -499,6 +508,7 @@ body {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -509,19 +519,31 @@ body {
   .no-print {
     display: none !important;
   }
-  
+
   body {
     margin: 0;
     padding: 0;
   }
-  
+
   .main-content {
     margin: 0 !important;
     padding: 20px !important;
   }
-  
+
   /* Hide all buttons except print-specific ones */
   button:not(.print-button) {
     display: none !important;
   }
+}
+
+/* Hide number input spinners globally */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+  appearance: none;
 }

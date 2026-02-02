@@ -480,6 +480,19 @@ export default function Transactions() {
     setWithdrawalPenalty(null);
     setCustomerEligibility(null);
 
+    // ALWAYS update the account number so the user can see what they are typing
+    setNewTransaction(prev => ({
+      ...prev,
+      accountNumber,
+      // Reset auto-filled fields if user starts typing again
+      agentId: "",
+      agentPhone: "",
+      customerId: "",
+      customerName: "",
+      customerPhone: "",
+      receiptNumber: ""
+    }));
+
     if (accountNumber) {
       // Find customer by account number
       const customer = allCustomers.find(c => c.accountNumber === accountNumber);

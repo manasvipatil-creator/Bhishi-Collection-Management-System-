@@ -30,31 +30,31 @@ export default function Dashboard() {
   const loadDashboardData = async () => {
     try {
       setFirebaseStatus("connecting");
-      
+
       // Fetch all agents directly from Firebase
       const agentsRef = ref(db, "agents");
       const agentsSnapshot = await get(agentsRef);
-      
+
       let totalAgents = 0;
       let totalCustomers = 0;
       let totalBalance = 0;
       let allTransactions = [];
-      
+
       if (agentsSnapshot.exists()) {
         const agentsData = agentsSnapshot.val();
         totalAgents = Object.keys(agentsData).length;
-        
+
         // Loop through each agent
         Object.entries(agentsData).forEach(([agentPhone, agentData]) => {
           const customers = agentData.customers || {};
           const customersArray = Object.values(customers);
-          
+
           // Count customers and calculate total balance
           totalCustomers += customersArray.length;
           customersArray.forEach(customer => {
             totalBalance += Number(customer.principalAmount || 0);
           });
-          
+
           // Get transactions for this agent
           const transactions = agentData.transactions || {};
           Object.entries(transactions).forEach(([customerPhone, customerTransactions]) => {
@@ -76,19 +76,19 @@ export default function Dashboard() {
           });
         });
       }
-      
+
       // Sort transactions by timestamp (newest first)
       allTransactions.sort((a, b) => b.timestamp - a.timestamp);
-      
+
       // Calculate transaction statistics
       const totalDeposits = allTransactions
         .filter(t => t.type === 'deposit')
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-      
+
       const totalPenalties = allTransactions
         .filter(t => t.type === 'penalty')
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-      
+
       const totalBonuses = allTransactions
         .filter(t => t.type === 'bonus')
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -106,7 +106,7 @@ export default function Dashboard() {
 
       // Get recent 5 transactions
       setRecentTransactions(allTransactions.slice(0, 5));
-      
+
       setFirebaseStatus("connected");
     } catch (error) {
       console.error("Error loading dashboard data:", error);

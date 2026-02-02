@@ -63,7 +63,7 @@ export default function ViewCustomers() {
             balance: customer.balance || customer.principalAmount || 0,
             accountNumber: customer.accountNumber || "N/A",
             address: customer.address || "N/A",
-            village: customer.address ? customer.address.split(',')[0].replace('Village ', '').trim() : "N/A",
+            village: customer.village || (customer.address && customer.address !== "N/A" ? customer.address.split(',')[0].replace('Village ', '').trim() : "N/A"),
             active: customer.active !== undefined ? customer.active : true
           })
         );
@@ -299,11 +299,18 @@ export default function ViewCustomers() {
                               </td>
                               <td>
                                 <button
+                                  className="btn btn-sm btn-info me-2 text-white"
+                                  onClick={() => navigate(`/agents/${agent.agentMobile}/customers/${cust.customerKey}`)}
+                                  title="View Profile"
+                                >
+                                  PROFILE
+                                </button>
+                                <button
                                   className="btn btn-sm btn-primary"
                                   onClick={() => handleViewTransactions(cust, agent)}
                                   title="View Transactions"
                                 >
-                                  VIEW TRANSACTIONS →
+                                  TRANSACTIONS
                                 </button>
                               </td>
                             </tr>

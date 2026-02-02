@@ -12,7 +12,8 @@ import {
   FiTrendingUp,
   FiAward,
   FiGift,
-  FiFileText
+  FiFileText,
+  FiPlusCircle
 } from "react-icons/fi";
 
 export default function Sidebar() {
@@ -24,6 +25,7 @@ export default function Sidebar() {
     { path: "/manage-routes", Icon: FiMap, label: "Manage Routes" },
     { path: "/add-agent", Icon: FiUserPlus, label: "Add Agent" },
     { path: "/view-agents", Icon: FiUsers, label: "View Agents" },
+    { path: "/add-customer", Icon: FiPlusCircle, label: "Add Customer" },
     { path: "/view-customers", Icon: FiUser, label: "View Customers" },
     { path: "/transactions", Icon: FiCreditCard, label: "Transactions" },
     { path: "/daily-collections", Icon: FiCalendar, label: "Daily Collections" },
@@ -35,8 +37,8 @@ export default function Sidebar() {
   ];
 
   return (
-    <div className="sidebar no-print" style={{ 
-      minHeight: "100vh", 
+    <div className="sidebar no-print" style={{
+      minHeight: "100vh",
       maxHeight: "100vh",
       width: "280px",
       overflowY: "auto",
@@ -91,12 +93,12 @@ export default function Sidebar() {
           {menuItems.map((item, index) => {
             const isActive = location.pathname === item.path;
             const isHovered = hoveredItem === index;
-            
+
             return (
               <li key={index} className="mb-2" style={{
                 animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both`
               }}>
-                <Link 
+                <Link
                   to={item.path}
                   onMouseEnter={() => setHoveredItem(index)}
                   onMouseLeave={() => setHoveredItem(null)}
@@ -107,14 +109,14 @@ export default function Sidebar() {
                     borderRadius: "12px",
                     textDecoration: "none",
                     color: isActive ? "white" : "rgba(255,255,255,0.7)",
-                    background: isActive 
+                    background: isActive
                       ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
                       : isHovered
-                      ? "rgba(255,255,255,0.08)"
-                      : "transparent",
+                        ? "rgba(255,255,255,0.08)"
+                        : "transparent",
                     transform: isHovered ? "translateX(5px)" : "translateX(0)",
                     transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                    boxShadow: isActive 
+                    boxShadow: isActive
                       ? "0 4px 15px rgba(102, 126, 234, 0.3)"
                       : "none",
                     border: isActive
@@ -138,7 +140,7 @@ export default function Sidebar() {
                       boxShadow: "0 0 10px rgba(255,255,255,0.5)"
                     }} />
                   )}
-                  
+
                   {/* Icon */}
                   <span style={{
                     fontSize: "1.2rem",
@@ -153,7 +155,7 @@ export default function Sidebar() {
                   }}>
                     <item.Icon size={18} />
                   </span>
-                  
+
                   {/* Label */}
                   <span style={{
                     fontSize: "0.9rem",
@@ -163,7 +165,7 @@ export default function Sidebar() {
                   }}>
                     {item.label}
                   </span>
-                  
+
                 </Link>
               </li>
             );
@@ -172,8 +174,8 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer Section */}
-      <div className="p-3" style={{ 
-        position: 'sticky', 
+      <div className="p-3" style={{
+        position: 'sticky',
         bottom: 0,
         background: 'linear-gradient(180deg, transparent 0%, #16213e 50%)',
         borderTop: '1px solid rgba(255,255,255,0.1)',
@@ -200,7 +202,7 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
-      
+
       {/* Animations */}
       <style>{`
         @keyframes slideInLeft {

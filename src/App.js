@@ -27,6 +27,8 @@ import AgentLogin from "./pages/AgentLogin";
 import AgentDashboard from "./pages/AgentDashboard";
 import AgentIdManager from "./pages/AgentIdManager";
 import AllData from "./pages/AllData";
+import AddCustomer from "./pages/AddCustomer";
+import CustomerProfile from "./pages/CustomerProfile";
 
 import AgentSequentialManager from "./pages/AgentSequentialManager";
 import SimpleIdConverter from "./pages/SimpleIdConverter";
@@ -59,6 +61,8 @@ function App() {
                       <Route path="/view-agents" element={<ViewAgents />} />
                       <Route path="/manage-routes" element={<ManageRoutes />} />
                       <Route path="/view-customers" element={<ViewCustomers />} />
+                      <Route path="/add-customer" element={<AddCustomer />} />
+                      <Route path="/agents/:agentId/customers/:customerId" element={<CustomerProfile />} />
                       <Route path="/daily-collections" element={<DailyCollections />} />
                       <Route path="/weekly-collections" element={<WeeklyCollections />} />
                       <Route path="/monthly-collections" element={<MonthlyCollections />} />
