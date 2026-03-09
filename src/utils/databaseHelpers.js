@@ -431,7 +431,7 @@ export const getAllTransactions = async () => {
         const customerPhones = snapshot.val();
         Object.entries(customerPhones).forEach(([customerPhone, transactions]) => {
           if (transactions && typeof transactions === 'object') {
-            const customerData = agent.customers ? 
+            const customerData = agent.customers ?
               Object.values(agent.customers).find(c => c.phone === customerPhone || c.phoneNumber === customerPhone) || agent.customers[customerPhone] : null;
 
             Object.entries(transactions).forEach(([txnKey, txnValue]) => {
@@ -460,7 +460,7 @@ export const getAllTransactions = async () => {
                 createdAt: txnValue.createdAt || '',
                 timestamp: txnValue.timestamp || Date.now()
               };
-              
+
               const uniqueKey = `${customerPhone}_${agent.phone}_${txnKey}`;
               transactionsMap[uniqueKey] = transaction;
             });
@@ -480,16 +480,16 @@ export const getAllTransactions = async () => {
           Object.entries(withdrawals).forEach(([txnKey, txnValue]) => {
             const date = txnValue.date || txnValue.withdrawalDate || '';
             const netAmount = Number(txnValue.netAmount || txnValue.amount || 0);
-            
+
             // Look for existing withdrawal from agent record to merge
             let merged = false;
             Object.keys(transactionsMap).forEach(key => {
               const existing = transactionsMap[key];
-              if (existing.customerPhone === customerPhone && 
-                  existing.type === 'withdrawal' && 
-                  existing.date === date && 
-                  (Number(existing.amount) === netAmount || Number(existing.netAmount) === netAmount)) {
-                
+              if (existing.customerPhone === customerPhone &&
+                existing.type === 'withdrawal' &&
+                existing.date === date &&
+                (Number(existing.amount) === netAmount || Number(existing.netAmount) === netAmount)) {
+
                 // Merge withdrawal collection data into agent record
                 transactionsMap[key] = {
                   ...existing,
@@ -510,10 +510,10 @@ export const getAllTransactions = async () => {
               for (const agent of agents) {
                 if (agent.customers) {
                   const customer = Object.values(agent.customers).find(c => c.phone === customerPhone || c.phoneNumber === customerPhone) || agent.customers[customerPhone];
-                  if (customer) { 
-                    agentDataForW = agent; 
-                    customerDataForW = customer; 
-                    break; 
+                  if (customer) {
+                    agentDataForW = agent;
+                    customerDataForW = customer;
+                    break;
                   }
                 }
               }
