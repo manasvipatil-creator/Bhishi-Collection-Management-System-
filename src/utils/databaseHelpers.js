@@ -215,67 +215,72 @@ export const addTransactionToAgent = async (agentPhone, transactionData) => {
       timestamp: Date.now()
     };
 
+    // Add onlineMobileNumber if payment method is online
+    if (transactionData.onlineMobileNumber && (transactionData.paymentMethod === 'online' || transactionData.mode === 'online')) {
+      transaction.onlineMobileNumber = transactionData.onlineMobileNumber;
+    }
+
     // Add withdrawal-specific fields if this is a withdrawal
     if (transactionData.type === 'withdrawal') {
-      transaction.netAmount = transactionData.netAmount || transactionData.amount;  // Amount customer receives
+      transaction.netAmount = transactionData.netAmount || transactionData.amount;
       transaction.penalty = transactionData.penalty || 0;
-      transaction.totalBalance = transactionData.totalBalance || 0;
       transaction.penaltyApplied = transactionData.penaltyApplied || false;
+      transaction.totalBalance = transactionData.totalBalance || 0;
     }
 
     await set(newTransactionRef, transaction);
 
     // Update customer's total deposits or withdrawals based on transaction type
     if (transaction.type === 'deposit' || transaction.type === 'withdrawal' || transaction.type === 'bonus' || transaction.type === 'penalty') {
+      // Recalculate totals and balance (non-blocking — notification fires regardless)
+      let updates = null;
       try {
-        // Recalculate totals and balance
-        const updates = await updateCustomerTotals(agentPhone, transactionData.customerPhone);
-
-        if (updates) {
-          // Send WhatsApp notification
-          if (transaction.type === 'deposit') {
-            try {
-              const agent = await getAgentById(agentPhone);
-              const customerRef = ref(db, `agents/${agentPhone}/customers/${transactionData.customerPhone}`);
-              const customerSnapshot = await get(customerRef);
-              const customer = customerSnapshot.exists() ? customerSnapshot.val() : {};
-
-              const notificationData = {
-                customerPhone: transactionData.customerPhone,
-                customerName: transactionData.customerName || customer.name,
-                amount: transaction.amount,
-                accountNumber: transactionData.accountNumber || customer.accountNumber || 'N/A',
-                totalAmount: updates.balance, // Show NET BALANCE after this deposit
-                agentName: agent?.name || agent?.agentInfo?.agentName || 'Agent'
-              };
-
-              await sendDepositNotification(notificationData);
-            } catch (notifError) {
-              console.error("WhatsApp notification failed:", notifError);
-            }
-          } else if (transaction.type === 'withdrawal') {
-            try {
-              const agent = await getAgentById(agentPhone);
-              const customerRef = ref(db, `agents/${agentPhone}/customers/${transactionData.customerPhone}`);
-              const customerSnapshot = await get(customerRef);
-              const customer = customerSnapshot.exists() ? customerSnapshot.val() : {};
-
-              // Use the updated balance (after withdrawal) for the notification
-              await sendWithdrawalNotification({
-                customerPhone: transactionData.customerPhone,
-                customerName: transactionData.customerName || customer.name,
-                amount: transaction.amount,
-                accountNumber: transactionData.accountNumber || customer.accountNumber || 'N/A',
-                totalAmount: updates.balance, // Show balance after withdrawal
-                agentName: agent?.name || 'Agent'
-              });
-            } catch (notifError) {
-              console.error("WhatsApp notification failed:", notifError);
-            }
-          }
-        }
+        updates = await updateCustomerTotals(agentPhone, transactionData.customerPhone);
       } catch (error) {
         console.error("Error updating customer totals:", error);
+      }
+
+      // Send WhatsApp notification — always fire, even if updates is null
+      if (transaction.type === 'deposit') {
+        try {
+          const agent = await getAgentById(agentPhone);
+          const customerRef = ref(db, `agents/${agentPhone}/customers/${transactionData.customerPhone}`);
+          const customerSnapshot = await get(customerRef);
+          const customer = customerSnapshot.exists() ? customerSnapshot.val() : {};
+
+          await sendDepositNotification({
+            customerPhone: transactionData.customerPhone,
+            customerName: transactionData.customerName || customer.name,
+            amount: transaction.amount,
+            accountNumber: transactionData.accountNumber || customer.accountNumber || 'N/A',
+            totalAmount: updates?.balance ?? transactionData.totalBalance ?? transaction.amount,
+            agentName: agent?.name || agent?.agentInfo?.agentName || 'Agent'
+          });
+        } catch (notifError) {
+          console.error("WhatsApp deposit notification failed:", notifError);
+        }
+      } else if (transaction.type === 'withdrawal') {
+        try {
+          const agent = await getAgentById(agentPhone);
+          const customerRef = ref(db, `agents/${agentPhone}/customers/${transactionData.customerPhone}`);
+          const customerSnapshot = await get(customerRef);
+          const customer = customerSnapshot.exists() ? customerSnapshot.val() : {};
+
+          // Pass fields exactly matching the webhook template:
+          // Dear {var1}, Requested:{var2}, Penalty:{var3}, Final:{var4}, AcctNo:{var5}, Balance:{var6}, Agent:{var7}
+          await sendWithdrawalNotification({
+            customerPhone: transactionData.customerPhone,
+            customerName: transactionData.customerName || customer.name,
+            amount: transactionData.requestedAmount || transactionData.originalAmount || transaction.amount,
+            penaltyAmount: transaction.penalty || 0,
+            netAmount: transaction.netAmount || transaction.amount,
+            accountNumber: transactionData.accountNumber || customer.accountNumber || 'N/A',
+            totalAmount: updates?.balance ?? transactionData.totalBalance ?? 0,
+            agentName: agent?.name || agent?.agentInfo?.agentName || 'Agent'
+          });
+        } catch (notifError) {
+          console.error("WhatsApp withdrawal notification failed:", notifError);
+        }
       }
     }
 
@@ -414,40 +419,23 @@ export const getAllTransactions = async () => {
   try {
     const agents = await getAllAgents();
     console.log("getAllTransactions - Agents found:", agents.length);
-    let allTransactions = [];
+    // Map to collect transactions and deduplicate
+    const transactionsMap = {}; // Key: customerPhone_agentPhone_txnId OR customerPhone_date_amount_type
 
     // Fetch transactions from agents/{agentPhone}/transactions
     for (const agent of agents) {
-      console.log(`Checking transactions for agent: ${agent.name} (${agent.phone})`);
-
-      // Get transactions organized by customer phone - using agent.phone as the key
       const agentTransactionsRef = ref(db, `agents/${agent.phone}/transactions`);
       const snapshot = await get(agentTransactionsRef);
 
-      console.log(`Agent ${agent.phone} transactions exists:`, snapshot.exists());
-
       if (snapshot.exists()) {
         const customerPhones = snapshot.val();
-        console.log(`Agent ${agent.phone} customer phones:`, Object.keys(customerPhones));
-
-        // Iterate through each customer phone number
         Object.entries(customerPhones).forEach(([customerPhone, transactions]) => {
-          console.log(`Processing transactions for customer phone: ${customerPhone}`, transactions);
-
           if (transactions && typeof transactions === 'object') {
-            // Get customer details from agent's customers
-            let customerData = null;
-            if (agent.customers) {
-              customerData = Object.values(agent.customers).find(c => c.phone === customerPhone || c.phoneNumber === customerPhone);
-              if (!customerData && agent.customers[customerPhone]) {
-                customerData = agent.customers[customerPhone];
-              }
-            }
+            const customerData = agent.customers ? 
+              Object.values(agent.customers).find(c => c.phone === customerPhone || c.phoneNumber === customerPhone) || agent.customers[customerPhone] : null;
 
-            console.log(`Customer data for ${customerPhone}:`, customerData);
-
-            // Iterate through transactions for this customer
             Object.entries(transactions).forEach(([txnKey, txnValue]) => {
+              const amount = Number(txnValue.amount || 0);
               const transaction = {
                 id: txnKey,
                 transactionId: txnValue.transactionId || txnKey,
@@ -458,7 +446,13 @@ export const getAllTransactions = async () => {
                 customerId: customerData?.customerId || '',
                 customerName: customerData?.name || txnValue.customerName || customerPhone,
                 type: txnValue.type || '',
-                amount: txnValue.amount || 0,
+                amount: amount,
+                netAmount: Number(txnValue.netAmount || amount || 0),
+                penalty: Number(txnValue.penalty || 0),
+                penaltyApplied: txnValue.penaltyApplied || false,
+                requestedAmount: Number(txnValue.requestedAmount || 0),
+                bonusAmount: Number(txnValue.bonusAmount || 0),
+                totalBalance: Number(txnValue.totalBalance || 0),
                 date: txnValue.date || '',
                 time: txnValue.time || txnValue.depositTime || '',
                 mode: txnValue.mode || '',
@@ -466,80 +460,102 @@ export const getAllTransactions = async () => {
                 createdAt: txnValue.createdAt || '',
                 timestamp: txnValue.timestamp || Date.now()
               };
-              console.log("Adding transaction:", transaction);
-              allTransactions.push(transaction);
+              
+              const uniqueKey = `${customerPhone}_${agent.phone}_${txnKey}`;
+              transactionsMap[uniqueKey] = transaction;
             });
           }
         });
       }
     }
 
-    // Fetch withdrawals from withdrawals/{customerPhone}/{transactionId}
-    console.log("Fetching withdrawals from withdrawals collection...");
+    // Merge withdrawals from withdrawals collection
     const withdrawalsRef = ref(db, 'withdrawals');
     const withdrawalsSnapshot = await get(withdrawalsRef);
 
     if (withdrawalsSnapshot.exists()) {
       const withdrawalsByCustomer = withdrawalsSnapshot.val();
-      console.log("Withdrawals customer phones:", Object.keys(withdrawalsByCustomer));
-
-      // Iterate through each customer phone number
       Object.entries(withdrawalsByCustomer).forEach(([customerPhone, withdrawals]) => {
-        console.log(`Processing withdrawals for customer phone: ${customerPhone}`, withdrawals);
-
         if (withdrawals && typeof withdrawals === 'object') {
-          // Find agent and customer data
-          let agentData = null;
-          let customerData = null;
-
-          for (const agent of agents) {
-            if (agent.customers) {
-              let customer = Object.values(agent.customers).find(c => c.phone === customerPhone || c.phoneNumber === customerPhone);
-              if (!customer && agent.customers[customerPhone]) {
-                customer = agent.customers[customerPhone];
-              }
-
-              if (customer) {
-                agentData = agent;
-                customerData = customer;
-                break;
-              }
-            }
-          }
-
-          // Iterate through withdrawals for this customer
           Object.entries(withdrawals).forEach(([txnKey, txnValue]) => {
-            const transaction = {
-              id: txnKey,
-              transactionId: txnValue.transactionId || txnKey,
-              agentId: agentData?.phone || '',
-              agentName: agentData?.name || '',
-              agentPhone: agentData?.phone || '',
-              customerPhone: customerPhone,
-              customerId: customerData?.customerId || txnValue.customerId || '',
-              customerName: customerData?.name || txnValue.customerName || customerPhone,
-              type: 'withdrawal',
-              amount: txnValue.amount || 0,
-              date: txnValue.date || '',
-              time: txnValue.time || '',
-              mode: txnValue.mode || '',
-              remarks: txnValue.remarks || txnValue.notes || '',
-              receiptNumber: txnValue.receiptNumber || '',
-              accountNumber: txnValue.accountNumber || '',
-              createdAt: txnValue.createdAt || '',
-              timestamp: txnValue.timestamp || Date.now()
-            };
-            console.log("Adding withdrawal transaction:", transaction);
-            allTransactions.push(transaction);
+            const date = txnValue.date || txnValue.withdrawalDate || '';
+            const netAmount = Number(txnValue.netAmount || txnValue.amount || 0);
+            
+            // Look for existing withdrawal from agent record to merge
+            let merged = false;
+            Object.keys(transactionsMap).forEach(key => {
+              const existing = transactionsMap[key];
+              if (existing.customerPhone === customerPhone && 
+                  existing.type === 'withdrawal' && 
+                  existing.date === date && 
+                  (Number(existing.amount) === netAmount || Number(existing.netAmount) === netAmount)) {
+                
+                // Merge withdrawal collection data into agent record
+                transactionsMap[key] = {
+                  ...existing,
+                  requestedAmount: Number(txnValue.requestedAmount || existing.requestedAmount),
+                  bonusAmount: Number(txnValue.bonusAmount || existing.bonusAmount),
+                  bonusIncluded: txnValue.bonusIncluded || false,
+                  penalty: Number(txnValue.penalty || existing.penalty),
+                  totalBalance: Number(txnValue.totalBalance || existing.totalBalance)
+                };
+                merged = true;
+              }
+            });
+
+            if (!merged) {
+              // If not found in agents, add as a new transaction
+              let agentDataForW = null;
+              let customerDataForW = null;
+              for (const agent of agents) {
+                if (agent.customers) {
+                  const customer = Object.values(agent.customers).find(c => c.phone === customerPhone || c.phoneNumber === customerPhone) || agent.customers[customerPhone];
+                  if (customer) { 
+                    agentDataForW = agent; 
+                    customerDataForW = customer; 
+                    break; 
+                  }
+                }
+              }
+
+              const newTxn = {
+                id: txnKey,
+                transactionId: txnValue.transactionId || txnKey,
+                agentId: agentDataForW?.phone || '',
+                agentName: agentDataForW?.name || '',
+                agentPhone: agentDataForW?.phone || '',
+                customerPhone: customerPhone,
+                customerId: customerDataForW?.customerId || txnValue.customerId || '',
+                customerName: customerDataForW?.name || txnValue.customerName || customerPhone,
+                type: 'withdrawal',
+                amount: netAmount,
+                netAmount: netAmount,
+                penalty: Number(txnValue.penalty || 0),
+                penaltyApplied: txnValue.penaltyApplied || false,
+                requestedAmount: Number(txnValue.requestedAmount || 0),
+                bonusAmount: Number(txnValue.bonusAmount || 0),
+                totalBalance: Number(txnValue.totalBalance || 0),
+                date: date,
+                time: txnValue.time || txnValue.withdrawalTime || '',
+                mode: txnValue.mode || '',
+                remarks: txnValue.remarks || txnValue.notes || '',
+                receiptNumber: txnValue.receiptNumber || '',
+                accountNumber: txnValue.accountNumber || '',
+                createdAt: txnValue.createdAt || '',
+                timestamp: txnValue.timestamp || Date.now()
+              };
+              transactionsMap[`WDR_${customerPhone}_${txnKey}`] = newTxn;
+            }
           });
         }
       });
     }
 
-    console.log("Total transactions found:", allTransactions.length);
+    const finalTransactions = Object.values(transactionsMap);
+    console.log("Total unique transactions found:", finalTransactions.length);
 
     // Sort by timestamp/date (newest first)
-    return allTransactions.sort((a, b) => {
+    return finalTransactions.sort((a, b) => {
       const dateA = a.timestamp || new Date(a.date).getTime();
       const dateB = b.timestamp || new Date(b.date).getTime();
       return dateB - dateA;
@@ -652,7 +668,7 @@ export const updateTransaction = async (agentPhone, customerPhone, transactionId
  * DELETE TRANSACTION
  * Deletes transaction from agents collection and optionally from withdrawals collection
  */
-export const deleteTransaction = async (agentPhone, customerPhone, transactionId) => {
+export const deleteTransaction = async (agentPhone, customerPhone, transactionId, withdrawalId = null) => {
   try {
     const transactionRef = ref(db, `agents/${agentPhone}/transactions/${customerPhone}/${transactionId}`);
 
@@ -673,8 +689,11 @@ export const deleteTransaction = async (agentPhone, customerPhone, transactionId
 
       // If it's a withdrawal, also remove from withdrawals collection
       if (transactionData.type === 'withdrawal') {
-        const withdrawalRef = ref(db, `withdrawals/${customerPhone}/${transactionId}`);
-        await remove(withdrawalRef);
+        const wId = withdrawalId || transactionData.withdrawalId || transactionId;
+        if (wId) {
+          const withdrawalRef = ref(db, `withdrawals/${customerPhone}/${wId}`);
+          await remove(withdrawalRef);
+        }
       }
     }
 
@@ -713,8 +732,9 @@ export const updateCustomerTotals = async (agentPhone, customerPhone) => {
           totalDeposits += amount;
           balance += amount;
         } else if (t.type === 'withdrawal') {
-          totalWithdrawals += amount;
-          balance -= amount;
+          const wdlPenalty = Number(t.penalty || 0);
+          totalWithdrawals += amount + wdlPenalty;
+          balance -= (amount + wdlPenalty);
         } else if (t.type === 'bonus') {
           totalBonuses += amount;
           balance += amount;
@@ -1242,7 +1262,7 @@ export const processEarlyWithdrawal = async (agentPhone, customerPhone, withdraw
 
     await set(newWithdrawalRef, withdrawal);
 
-    // Also add to agent's transactions
+    // Also add to agent's transactions (clean format matching desired record structure)
     await addTransactionToAgent(agentPhone, {
       customerPhone,
       customerId: additionalData.customerId || customerPhone,
@@ -1250,23 +1270,18 @@ export const processEarlyWithdrawal = async (agentPhone, customerPhone, withdraw
       accountNumber: additionalData.accountNumber || '',
       receiptNumber: additionalData.receiptNumber || `WDR${Date.now()}`,
       type: 'withdrawal',
-      amount: penaltyInfo.netAmount, // Main amount field for display
-      originalAmount: penaltyInfo.totalBalance, // Store the withdrawal amount (deposits only, without bonus)
-      requestedAmount: penaltyInfo.originalAmount,
-      actualAmount: penaltyInfo.actualWithdrawalAmount,
-      netAmount: penaltyInfo.netAmount,
-      totalBalance: penaltyInfo.totalBalance,
-      penalty: penaltyInfo.penalty,
-      bonusAmount: penaltyInfo.bonusAmount,
-      bonusIncluded: penaltyInfo.bonusIncluded,
+      amount: penaltyInfo.netAmount,          // amount = final payout (after penalty)
+      netAmount: penaltyInfo.netAmount,           // same — what customer receives
+      penalty: penaltyInfo.penalty,             // penalty deducted
       penaltyApplied: penaltyInfo.penaltyApplied,
+      totalBalance: penaltyInfo.totalBalance,        // customer's total deposits before withdrawal
+      requestedAmount: penaltyInfo.originalAmount,      // used only for WhatsApp notification, NOT stored
       paymentMethod: additionalData.paymentMethod || 'cash',
+      onlineMobileNumber: additionalData.onlineMobileNumber,
       time: additionalData.time || new Date().toLocaleTimeString('en-IN'),
-      remarks: penaltyInfo.bonusIncluded ?
-        `✅ Full Bonus: ₹${penaltyInfo.actualWithdrawalAmount.toLocaleString()} (₹${penaltyInfo.totalBalance.toLocaleString()} + ₹${penaltyInfo.bonusAmount.toLocaleString()} bonus)` :
-        penaltyInfo.penaltyApplied ?
-          `Penalty: ₹${penaltyInfo.penalty} (5% of ₹${penaltyInfo.originalAmount})` :
-          'No penalty',
+      remarks: penaltyInfo.penaltyApplied
+        ? `Penalty: ₹${penaltyInfo.penalty} (5% of ₹${penaltyInfo.originalAmount})`
+        : 'No penalty',
       date: additionalData.date || new Date().toISOString().split('T')[0]
     });
 
@@ -1323,7 +1338,7 @@ export const getAllEligibleCustomers = async (filterYear = null) => {
             ...eligibility,
             twelfthMonthStatus: twelfthMonth,
             // Give bonus if total deposits >= 12000, regardless of delay
-            bonusAmount: eligibility.totalDeposits >= 12000 ? 1000 : 0
+            bonusAmount: eligibility.totalBonusAccrued || 0
           });
         }
       }

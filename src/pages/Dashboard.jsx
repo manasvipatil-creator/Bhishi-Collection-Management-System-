@@ -207,7 +207,7 @@ export default function Dashboard() {
                           </td>
                           <td>₹{Number(transaction.amount).toLocaleString()}</td>
                           <td>{transaction.agentName}</td>
-                          <td>{new Date(transaction.date).toLocaleDateString()}</td>
+                          <td>{new Date(transaction.date).toLocaleDateString('en-GB')}</td>
                         </tr>
                       ))}
                     </tbody>

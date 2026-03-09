@@ -131,7 +131,7 @@ export default function ViewCollections() {
                       <td className="fw-semibold">{collection.receiptNo}</td>
                       <td>{collection.customerId}</td>
                       <td className="fw-bold">₹{Number(collection.amountDeposited).toLocaleString()}</td>
-                      <td>{new Date(collection.depositDate).toLocaleDateString()}</td>
+                      <td>{new Date(collection.depositDate).toLocaleDateString('en-GB')}</td>
                       <td>
                         <span className="badge bg-success">
                           ✅ {collection.status || 'Completed'}

@@ -124,8 +124,8 @@ export default function YearEndBonus() {
         timeline: `Start: ${customer.startDate}\n${customer.completedMonths}/12 Months`,
         deposits: `Rs. ${customer.totalDeposits.toLocaleString()}`,
         twelfth: customer.twelfthMonthStatus.hasMissedPayment ? `Delayed (${customer.twelfthMonthStatus.missedDays}d)` : "On Time",
-        bonus: isFullBonus ? "Rs. 1,000" : "-",
-        payout: `Rs. ${(customer.totalDeposits + (isFullBonus ? 1000 : 0)).toLocaleString()}`,
+        bonus: `Rs. ${customer.bonusAmount.toLocaleString()}`,
+        payout: `Rs. ${(customer.totalDeposits + customer.bonusAmount).toLocaleString()}`,
         status: isFullBonus ? "Full Bonus" : "In Progress"
       };
     });
@@ -192,7 +192,7 @@ export default function YearEndBonus() {
   const totalEligibleCustomers = eligibleCustomers.length;
   const fullBonusCustomers = eligibleCustomers.filter(c => c.totalDeposits >= 12000).length;
   const partialBonusCustomers = eligibleCustomers.filter(c => c.totalDeposits < 12000).length;
-  const totalBonusAmount = fullBonusCustomers * 1000;
+  const totalBonusAmount = eligibleCustomers.reduce((sum, c) => sum + (c.bonusAmount || 0), 0);
 
   return (
     <div className="yeb-container fade-in-up">
@@ -406,9 +406,9 @@ export default function YearEndBonus() {
                         )}
                       </td>
                       <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
-                        {isFullBonus ? (
+                        {customer.bonusAmount > 0 ? (
                           <span style={{ color: 'var(--success-color)', fontWeight: '600', fontSize: '0.95rem' }}>
-                            +₹1,000
+                            +₹{customer.bonusAmount.toLocaleString()}
                           </span>
                         ) : (
                           <span style={{ color: '#9ca3af', fontWeight: '500' }}>-</span>
@@ -416,7 +416,7 @@ export default function YearEndBonus() {
                       </td>
                       <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
                         <span style={{ fontWeight: '600', color: 'var(--primary-color)', fontSize: '0.95rem' }}>
-                          ₹{(customer.totalDeposits + (isFullBonus ? 1000 : 0)).toLocaleString()}
+                          ₹{(customer.totalDeposits + (customer.bonusAmount || 0)).toLocaleString()}
                         </span>
                       </td>
                       <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>

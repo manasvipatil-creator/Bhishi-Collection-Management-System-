@@ -138,7 +138,7 @@ export default function DailyCollections() {
 
     const totalWithdrawals = filteredTransactions
       .filter(t => t.type === 'withdrawal')
-      .reduce((sum, t) => sum + (t.netAmount || t.amount || 0), 0);
+      .reduce((sum, t) => sum + (Number(t.amount || 0) + Number(t.penalty || 0)), 0);
 
     setDailyTransactions(enrichedTransactions);
     setStats({
@@ -337,7 +337,7 @@ export default function DailyCollections() {
                       <td>
                         <div>
                           <strong className={txn.type === 'deposit' ? 'text-success' : 'text-danger'}>
-                            ₹{(txn.netAmount || txn.amount || 0).toLocaleString()}
+                            ₹{(Number(txn.amount || 0) + Number(txn.penalty || 0)).toLocaleString()}
                           </strong>
                           {txn.bonusIncluded && (
                             <div>
@@ -615,7 +615,7 @@ export default function DailyCollections() {
                         color: txn.type === 'deposit' ? '#28a745' : '#dc3545',
                         fontSize: '11px'
                       }}>
-                        ₹{(txn.netAmount || txn.amount || 0).toLocaleString()}
+                        ₹{(Number(txn.amount || 0) + Number(txn.penalty || 0)).toLocaleString()}
                       </div>
                       {txn.bonusIncluded && (
                         <div style={{ fontSize: '8px', color: '#28a745' }}>+₹{txn.bonusAmount} bonus</div>

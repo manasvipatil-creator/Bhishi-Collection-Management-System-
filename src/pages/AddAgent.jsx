@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ref, push, set, update, onValue } from "firebase/database";
 import { db } from "../firebase";
-import { addAgentWithId, generateUniqueAgentId } from "../utils/agentIdRestructure";
+import { addAgentWithId, generateUniqueAgentId, updateAgentData } from "../utils/agentIdRestructure";
 import { addSampleRoutes } from "../utils/addSampleRoutes";
 
 export default function AddAgent() {
@@ -18,7 +18,7 @@ export default function AddAgent() {
     routes: [],
     status: "active"
   });
-  
+
   const [availableRoutes, setAvailableRoutes] = useState([]);
   const [selectedRouteId, setSelectedRouteId] = useState("");
 
@@ -61,7 +61,7 @@ export default function AddAgent() {
         }
         return route;
       });
-      
+
       setAgent({
         agentName: editAgent.agentName || "",
         mobileNumber: editAgent.mobileNumber || editAgent.id || "",
@@ -81,7 +81,7 @@ export default function AddAgent() {
 
   const validateField = (name, value) => {
     let error = "";
-    
+
     switch (name) {
       case "mobileNumber":
         if (value && !/^\d{10}$/.test(value)) {
@@ -101,7 +101,7 @@ export default function AddAgent() {
       default:
         break;
     }
-    
+
     return error;
   };
 
@@ -123,12 +123,12 @@ export default function AddAgent() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
+
     const updatedAgent = {
       ...agent,
       [name]: value
     };
-    
+
     setAgent(updatedAgent);
 
     // Generate preview ID when name or mobile changes
@@ -225,10 +225,11 @@ export default function AddAgent() {
       if (isEditMode) {
         // Update existing agent
         setLoadingMessage("Updating agent...");
-        
-        const agentRef = ref(db, `agents/${editAgent.id}/agentInfo`);
-        await update(agentRef, {
+
+        await updateAgentData(editAgent.id, {
+          agentId: previewAgentId,
           agentName: agent.agentName,
+          mobileNumber: agent.mobileNumber,
           routes: agent.routes,
           password: agent.password,
           status: agent.status
@@ -236,15 +237,15 @@ export default function AddAgent() {
 
         console.log("Agent updated successfully");
         setLoadingMessage("Success! Redirecting...");
-        
+
         setTimeout(() => {
           navigate("/view-agents");
         }, 500);
-        
+
       } else {
         // Add new agent
         setLoadingMessage("Generating Agent ID...");
-        
+
         const result = await addAgentWithId({
           agentName: agent.agentName,
           mobileNumber: agent.mobileNumber,
@@ -274,7 +275,7 @@ export default function AddAgent() {
           throw new Error(result.message);
         }
       }
-      
+
     } catch (error) {
       console.error(`Error ${isEditMode ? 'updating' : 'adding'} agent:`, error);
       setLoadingMessage("");
@@ -335,11 +336,11 @@ export default function AddAgent() {
                         onChange={handleChange}
                         placeholder={`Enter ${label.toLowerCase()}`}
                         required={field !== "password" || !isEditMode}
-                        disabled={field === "mobileNumber" && isEditMode}
+                        disabled={false}
                         autoComplete={field === "mobileNumber" ? "off" : field === "password" ? "new-password" : "off"}
                       />
                       {field === "mobileNumber" && isEditMode && (
-                        <small className="text-muted">Mobile number cannot be changed</small>
+                        <small className="text-info">💡 Changing mobile number will move all agent data to the new number.</small>
                       )}
                       {errors[field] && (
                         <div className="invalid-feedback">
@@ -360,7 +361,7 @@ export default function AddAgent() {
                 {/* Routes Section */}
                 <div className="mb-4">
                   <label className="form-label">Routes</label>
-                  
+
                   {/* Select from existing routes */}
                   {availableRoutes.length > 0 ? (
                     <div className="input-group mb-2">
@@ -401,7 +402,7 @@ export default function AddAgent() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Display added routes */}
                   {agent.routes.length > 0 && (
                     <div className="d-flex flex-wrap gap-2 mt-2">
@@ -409,7 +410,7 @@ export default function AddAgent() {
                         // Handle both string and object formats
                         const routeName = typeof route === 'string' ? route : route.name;
                         const villages = typeof route === 'object' ? route.villages : [];
-                        
+
                         return (
                           <div
                             key={index}
@@ -428,15 +429,15 @@ export default function AddAgent() {
                               type="button"
                               className="btn-close btn-close-white"
                               style={{ fontSize: '0.6rem' }}
-                            onClick={() => handleRemoveRoute(routeName)}
-                            aria-label="Remove route"
-                          ></button>
+                              onClick={() => handleRemoveRoute(routeName)}
+                              aria-label="Remove route"
+                            ></button>
                           </div>
                         );
                       })}
                     </div>
                   )}
-                  
+
                   {agent.routes.length === 0 && (
                     <small className="text-muted">No routes added yet. Add at least one route.</small>
                   )}

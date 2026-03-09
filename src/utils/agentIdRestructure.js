@@ -1,4 +1,4 @@
-import { ref, get, set, remove } from "firebase/database";
+import { ref, get, set, remove, update } from "firebase/database";
 import { db } from "../firebase";
 
 /**
@@ -206,6 +206,58 @@ export const restructureAgentsToMobileKeys = async () => {
   }
 };
 
+// ✅ Update agent with possible mobile number change
+export const updateAgentData = async (oldMobile, updatedAgentInfo) => {
+  try {
+    const newMobile = updatedAgentInfo.mobileNumber;
+    const agentsRef = ref(db, "agents");
+
+    if (oldMobile !== newMobile) {
+      // 1. Check if new mobile already exists
+      const exists = await checkAgentExists(newMobile);
+      if (exists) {
+        throw new Error("Another agent with this mobile number already exists.");
+      }
+
+      // 2. Get ALL old data (customers, transactions, etc.)
+      const oldAgentRef = ref(db, `agents/${oldMobile}`);
+      const snapshot = await get(oldAgentRef);
+      if (!snapshot.exists()) {
+        throw new Error("Original agent not found.");
+      }
+
+      const totalData = snapshot.val();
+
+      // 3. Update the agentInfo part
+      totalData.agentInfo = {
+        ...totalData.agentInfo,
+        ...updatedAgentInfo,
+        updatedAt: new Date().toISOString()
+      };
+
+      // 4. Set data at new location
+      const newAgentRef = ref(db, `agents/${newMobile}`);
+      await set(newAgentRef, totalData);
+
+      // 5. Delete old location
+      await remove(oldAgentRef);
+
+      return { success: true, message: "Agent updated and mobile number changed." };
+    } else {
+      // Just update existing agentInfo
+      const agentInfoRef = ref(db, `agents/${oldMobile}/agentInfo`);
+      await update(agentInfoRef, {
+        ...updatedAgentInfo,
+        updatedAt: new Date().toISOString()
+      });
+      return { success: true, message: "Agent updated successfully." };
+    }
+  } catch (error) {
+    console.error("Error updating agent data:", error);
+    throw error;
+  }
+};
+
 // ------- Backwards-compatible alias -------
 export const restructureAgentsWithIds = restructureAgentsToMobileKeys;
 
@@ -218,7 +270,8 @@ const agentUtils = {
   checkAgentIdExists,
   getAllAgentsWithIds,
   restructureAgentsToMobileKeys,
-  restructureAgentsWithIds
+  restructureAgentsWithIds,
+  updateAgentData
 };
 
 export default agentUtils;

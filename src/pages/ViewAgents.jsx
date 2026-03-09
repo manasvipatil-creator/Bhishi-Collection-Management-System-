@@ -426,7 +426,7 @@ export default function ViewAgents() {
                         </div>
                         <div className="va-detail-row mt-2">
                           <span className="va-label">Created:</span>
-                          <span className="va-value">{selectedAgent.createdAt ? new Date(selectedAgent.createdAt).toLocaleDateString() : 'N/A'}</span>
+                          <span className="va-value">{selectedAgent.createdAt ? new Date(selectedAgent.createdAt).toLocaleDateString('en-GB') : 'N/A'}</span>
                         </div>
                       </div>
                     </div>

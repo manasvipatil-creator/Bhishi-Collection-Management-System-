@@ -156,7 +156,7 @@ export default function AddCollection() {
                       </div>
                       <div className="col-md-6">
                         <small className="text-muted">Deposit Date:</small>
-                        <div className="fw-bold">{new Date(data.depositDate).toLocaleDateString()}</div>
+                        <div className="fw-bold">{new Date(data.depositDate).toLocaleDateString('en-GB')}</div>
                       </div>
                     </div>
                   </div>

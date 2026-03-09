@@ -196,7 +196,7 @@ export default function CustomerProfile() {
                                             </div>
                                             <div className="col-md-6">
                                                 <div className="info-label">Joining Date</div>
-                                                <div className="info-value">{customer.startDate ? new Date(customer.startDate).toLocaleDateString() : 'N/A'}</div>
+                                                <div className="info-value">{customer.startDate ? new Date(customer.startDate).toLocaleDateString('en-GB') : 'N/A'}</div>
                                             </div>
                                             <div className="col-12">
                                                 <div className="info-label">Agent Mobile</div>

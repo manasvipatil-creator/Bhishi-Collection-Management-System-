@@ -3,7 +3,8 @@
  * Sends transaction notifications via WhatsApp webhook API
  */
 
-const WEBHOOK_BASE_URL = 'https://webhook.whatapi.in/webhook/69213b981b9845c02d533ccb';
+const WITHDRAWAL_WEBHOOK_URL = 'https://webhook.whatapi.in/webhook/69aa76e002e28c7ee4e36141';
+const DEPOSIT_WEBHOOK_URL = 'https://webhook.whatapi.in/webhook/69aa76e002e28c7ee4e36141';
 
 /**
  * Helper: Format Indian phone number
@@ -16,7 +17,7 @@ const formatPhoneNumber = (phone) => {
 /**
  * Helper: Send WhatsApp Message
  */
-const sendWhatsAppMessage = async (phone, messageParams) => {
+const sendWhatsAppMessage = async (phone, messageParams, webhookBaseUrl) => {
   try {
     console.log('=== Starting WhatsApp Message Send ===');
     console.log('Phone:', phone);
@@ -34,7 +35,7 @@ const sendWhatsAppMessage = async (phone, messageParams) => {
     const encodedMessage = encodeURIComponent(message);
     console.log('Encoded message:', encodedMessage);
     
-    const webhookUrl = `${WEBHOOK_BASE_URL}?number=${phone}&message=${encodedMessage}`;
+    const webhookUrl = `${webhookBaseUrl}?number=${phone}&message=${encodedMessage}`;
     console.log('Final Webhook URL:', webhookUrl);
 
     // Add timeout to the fetch request
@@ -134,12 +135,12 @@ export const sendDepositNotification = async (data) => {
     const formattedAmount = Number(amount).toFixed(2);
     const formattedTotal = Number(totalAmount || amount).toFixed(2);
     
-    // Create message parameters array for the webhook
+    // Create message parameters array for the deposit webhook
+    // Format: deposited,var1,var2,var3,var4,var5  (6 params total)
     const messageParams = [
-      'bhishi',
+      'deposited',
       customerName || 'Customer',
       formattedAmount,
-      'deposit',
       accountNumber || 'N/A',
       formattedTotal,
       agentName || 'Agent'
@@ -148,7 +149,7 @@ export const sendDepositNotification = async (data) => {
     console.log('Sending deposit notification with parameters:');
     console.log(messageParams);
 
-    const result = await sendWhatsAppMessage(phone, messageParams);
+    const result = await sendWhatsAppMessage(phone, messageParams, DEPOSIT_WEBHOOK_URL);
     console.log('Notification sent successfully:', result);
 
     return { 
@@ -178,10 +179,12 @@ export const sendWithdrawalNotification = async (data) => {
     const {
       customerPhone,
       customerName,
-      amount,
-      accountNumber,
-      totalAmount,
-      agentName
+      amount,        // Requested withdrawal amount
+      penaltyAmount, // Penalty deducted (if any)
+      netAmount,     // Final payout to customer (Final Amount)
+      accountNumber, // Account No
+      totalAmount,   // Remaining Balance after withdrawal
+      agentName      // Agent name
     } = data;
 
     // Validate required fields
@@ -190,7 +193,7 @@ export const sendWithdrawalNotification = async (data) => {
       console.error(errorMsg);
       throw new Error(errorMsg);
     }
-    
+
     if (amount === undefined || amount === null) {
       const errorMsg = 'Amount is required';
       console.error(errorMsg);
@@ -198,32 +201,43 @@ export const sendWithdrawalNotification = async (data) => {
     }
 
     // Format values
-    const phone = formatPhoneNumber(customerPhone);
-    const formattedAmount = Number(amount).toFixed(2);
-    const formattedTotal = Number(totalAmount || 0).toFixed(2);
-    
-    console.log('Withdrawal Details:', {
-      amount: formattedAmount,
-      totalAfterWithdrawal: formattedTotal,
-      accountNumber,
-      customerName
+    const phone            = formatPhoneNumber(customerPhone);
+    const penaltyAmt       = Number(penaltyAmount || 0);
+    const requestAmt       = Number(amount        || 0);
+    const formattedRequest = requestAmt.toFixed(2);
+    const formattedFinal   = Number(netAmount ?? amount).toFixed(2);
+    const formattedBalance = Number(totalAmount   || 0).toFixed(2);
+    const acctNo           = accountNumber || 'N/A';
+    const agent            = agentName    || 'Agent';
+
+    // Format penalty: descriptive when applied, "0.00" when no penalty
+    const formattedPenalty = penaltyAmt > 0
+      ? `Penalty Applied - Rs.${penaltyAmt.toFixed(2)} (5% of Rs.${requestAmt.toFixed(2)})`
+      : '0.00';
+
+    console.log('Withdrawal Notification Details:', {
+      customerName, formattedRequest, formattedPenalty,
+      formattedFinal, acctNo, formattedBalance, agent
     });
-    
-    // Create message parameters array for the webhook
+
+    // Webhook template:
+    // Dear {var1}, Requested: {var2}, Penalty: {var3},
+    // Final Amount: {var4}, Account No: {var5}, Remaining Balance: {var6}, Agent: {var7}
     const messageParams = [
-      'bhishi',
-      customerName || 'Customer',
-      formattedAmount,
-      'withdraw',
-      accountNumber || 'N/A',
-      formattedTotal, // Show total after withdrawal
-      agentName || 'Agent'
+      'withdrawal',
+      customerName    || 'Customer', // var1 — Dear {name}
+      formattedRequest,              // var2 — Requested amount
+      formattedPenalty,              // var3 — "Penalty Applied - Rs.5 (5% of Rs.100)" or "Nil"
+      formattedFinal,                // var4 — Final Amount (net payout)
+      acctNo,                        // var5 — Account No
+      formattedBalance,              // var6 — Remaining Balance
+      agent                          // var7 — Agent name
     ];
 
     console.log('Sending withdrawal notification with parameters:');
     console.log(messageParams);
 
-    const result = await sendWhatsAppMessage(phone, messageParams);
+    const result = await sendWhatsAppMessage(phone, messageParams, WITHDRAWAL_WEBHOOK_URL);
     console.log('Withdrawal notification sent successfully:', result);
 
     return { 
@@ -291,7 +305,7 @@ export const sendCreditNotification = async (data) => {
     console.log('Sending credit notification with parameters:');
     console.log(messageParams);
 
-    const result = await sendWhatsAppMessage(phone, messageParams);
+    const result = await sendWhatsAppMessage(phone, messageParams, DEPOSIT_WEBHOOK_URL);
     console.log('Credit notification sent successfully:', result);
 
     return { 
@@ -326,10 +340,13 @@ export const sendCreditNotification = async (data) => {
 export const testWebhook = async (phone = '919876543210', name = 'Test User', amount = 1000, type = 'deposit', accountNo = 'TEST123', total = 1000, agent = 'Test Agent') => {
   try {
     console.log('=== Testing Webhook ===');
-    const testParams = ['bhishi', name, amount.toString(), type, accountNo, total.toString(), agent];
+    const webhookUrl = type === 'withdrawal' ? WITHDRAWAL_WEBHOOK_URL : DEPOSIT_WEBHOOK_URL;
+    const testParams = type === 'withdrawal'
+      ? ['withdrawal', name, amount.toString(), accountNo, total.toString(), agent, '', '']
+      : ['deposited', name, amount.toString(), accountNo, total.toString(), agent];
     console.log('Test Parameters:', testParams);
     
-    const result = await sendWhatsAppMessage(phone, testParams);
+    const result = await sendWhatsAppMessage(phone, testParams, webhookUrl);
     console.log('Test Result:', result);
     
     if (result.success) {

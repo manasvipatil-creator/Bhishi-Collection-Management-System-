@@ -79,7 +79,11 @@ export default function MonthlyCollections() {
                 customerPhone,
                 customerName: txn.customerName || customerData.name || customerPhone,
                 // Support both old and new field formats
-                amount: Number(txn.amount || 0),
+                amount: txn.type === 'withdrawal' 
+                  ? Number(txn.amount || 0) + Number(txn.penalty || 0)
+                  : Number(txn.amount || 0),
+                netAmount: Number(txn.amount || 0),
+                penalty: Number(txn.penalty || 0),
                 date: txn.date || '',
                 time: txn.time || '',
                 type: txn.type || 'deposit',
@@ -110,7 +114,11 @@ export default function MonthlyCollections() {
                 customerPhone,
                 customerName: txn.customerName || customer?.name || customerPhone,
                 // Support both old and new field formats
-                amount: Number(txn.amount || txn.amountDeposited || 0),
+                amount: txn.type === 'withdrawal'
+                  ? Number(txn.amount || txn.amountDeposited || 0) + Number(txn.penalty || 0)
+                  : Number(txn.amount || txn.amountDeposited || 0),
+                netAmount: Number(txn.amount || txn.amountDeposited || 0),
+                penalty: Number(txn.penalty || 0),
                 date: txn.depositDate || txn.date || '',
                 time: txn.depositTime || txn.time || '',
                 type: txn.type || 'deposit',
@@ -160,7 +168,7 @@ export default function MonthlyCollections() {
       ...transaction,
       amount: Number(transaction.amount) || 0,
       depositAmount: transaction.type === 'deposit' ? Number(transaction.amount) || 0 : 0,
-      withdrawAmount: transaction.type === 'withdrawal' ? Number(transaction.amount) || 0 : 0,
+      withdrawAmount: transaction.type === 'withdrawal' ? (Number(transaction.amount) || 0) : 0,
       interest: Number(transaction.interest) || 0
     })).sort((a, b) => new Date(b.date) - new Date(a.date));
   };
@@ -828,7 +836,7 @@ export default function MonthlyCollections() {
                     filteredCollections.map((collection, index) => (
                       <tr key={index}>
                         <td className="fw-semibold">
-                          <div>{new Date(collection.date).toLocaleDateString()}</div>
+                          <div>{new Date(collection.date).toLocaleDateString('en-GB')}</div>
                           {collection.time && (
                             <small className="text-muted">{collection.time}</small>
                           )}

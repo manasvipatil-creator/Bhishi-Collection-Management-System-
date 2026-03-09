@@ -102,7 +102,7 @@ export default function Reports() {
         totalCustomers: agentCustomers.length || 0,
         totalTransactions: agentTransactions.length || 0,
         totalDeposits: agentTransactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + (t.amount || 0), 0),
-        totalWithdrawals: agentTransactions.filter(t => t.type === 'withdrawal').reduce((sum, t) => sum + (t.amount || 0), 0)
+        totalWithdrawals: agentTransactions.filter(t => t.type === 'withdrawal').reduce((sum, t) => sum + (Number(t.amount || 0) + Number(t.penalty || 0)), 0)
       };
     });
   };
@@ -120,7 +120,7 @@ export default function Reports() {
     return filteredCustomers.map(customer => {
       const customerTransactions = transactions.filter(t => t.customerPhone === customer.phone);
       const totalDeposits = customerTransactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + (t.amount || 0), 0);
-      const totalWithdrawals = customerTransactions.filter(t => t.type === 'withdrawal').reduce((sum, t) => sum + (t.amount || 0), 0);
+      const totalWithdrawals = customerTransactions.filter(t => t.type === 'withdrawal').reduce((sum, t) => sum + (Number(t.amount || 0) + Number(t.penalty || 0)), 0);
 
       return {
         customerName: customer.name,
@@ -204,7 +204,8 @@ export default function Reports() {
       if (t.type === 'deposit') {
         dailyGroups[date].totalDeposits += (t.amount || 0);
       } else if (t.type === 'withdrawal') {
-        dailyGroups[date].totalWithdrawals += (t.netAmount || t.amount || 0);
+        const withdrawalDeduction = Number(t.amount || 0) + Number(t.penalty || 0);
+        dailyGroups[date].totalWithdrawals += withdrawalDeduction;
       }
     });
 
@@ -230,8 +231,8 @@ export default function Reports() {
       filteredTransactions = filteredTransactions.filter(t => new Date(t.date) <= new Date(toDate));
     }
 
-    const totalDeposits = filteredTransactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + (t.amount || 0), 0);
-    const totalWithdrawals = filteredTransactions.filter(t => t.type === 'withdrawal').reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalDeposits = filteredTransactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const totalWithdrawals = filteredTransactions.filter(t => t.type === 'withdrawal').reduce((sum, t) => sum + (Number(t.amount || 0) + Number(t.penalty || 0)), 0);
     const totalPenalties = filteredTransactions.filter(t => t.type === 'penalty').reduce((sum, t) => sum + (t.amount || 0), 0);
     const totalBonuses = filteredTransactions.filter(t => t.type === 'bonus').reduce((sum, t) => sum + (t.amount || 0), 0);
 
@@ -552,7 +553,7 @@ export default function Reports() {
                         )}
                         {selectedReport === 'transactions' && (
                           <>
-                            <td>{row.date ? new Date(row.date).toLocaleDateString() : 'N/A'}</td>
+                            <td>{row.date ? new Date(row.date).toLocaleDateString('en-GB') : 'N/A'}</td>
                             <td>{row.customerName}</td>
                             <td>{row.agentName}</td>
                             <td><span className={`badge bg-${row.type === 'deposit' ? 'success' : 'danger'}`}>{row.type}</span></td>

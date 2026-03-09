@@ -73,6 +73,7 @@ export default function Transactions() {
     type: "deposit", // deposit, withdrawal, penalty, bonus
     amount: "",
     paymentMethod: "cash",
+    onlineMobileNumber: "",
     accountNumber: "",
     receiptNumber: "",
     remarks: "",
@@ -220,7 +221,7 @@ export default function Transactions() {
 
       const totalWithdrawals = customerTransactions
         .filter(t => t.type === 'withdrawal')
-        .reduce((sum, t) => sum + Number(t.requestedAmount || t.amount || 0), 0);
+        .reduce((sum, t) => sum + (Number(t.amount || 0) + Number(t.penalty || 0)), 0);
 
       const totalBonuses = customerTransactions
         .filter(t => t.type === 'bonus')
@@ -431,20 +432,22 @@ export default function Transactions() {
 
   const calculateTotals = (txns) => {
     let d = 0, w = 0, p = 0, b = 0;
+    let standalone_p = 0;
     txns.forEach(t => {
       if (t.type === 'deposit') {
         d += Number(t.amount || 0);
       } else if (t.type === 'withdrawal') {
-        w += Number(t.requestedAmount || t.originalAmount || t.amount || 0);
+        w += Number(t.amount || 0) + Number(t.penalty || 0);
         p += Number(t.penalty || 0);
         b += Number(t.bonusAmount || 0);
       } else if (t.type === 'bonus') {
         b += Number(t.amount || 0);
       } else if (t.type === 'penalty') {
         p += Number(t.amount || 0);
+        standalone_p += Number(t.amount || 0);
       }
     });
-    return { d, w, p, b, bal: (d + b) - (w + p) };
+    return { d, w, p, b, bal: (d + b) - (w + standalone_p) };
   };
 
   if (viewMode === 'transactions' && selectedCustomerTransactions.length > 0) {
@@ -760,6 +763,7 @@ export default function Transactions() {
             accountNumber: newTransaction.accountNumber,
             receiptNumber: newTransaction.receiptNumber,
             paymentMethod: newTransaction.paymentMethod,
+            onlineMobileNumber: newTransaction.paymentMethod === 'online' ? newTransaction.onlineMobileNumber : undefined,
             date: newTransaction.date,
             time: new Date().toLocaleTimeString('en-IN')
           }
@@ -810,6 +814,7 @@ export default function Transactions() {
           date: newTransaction.date,
           time: new Date().toLocaleTimeString('en-IN'),  // Add time field
           paymentMethod: newTransaction.paymentMethod,
+          onlineMobileNumber: newTransaction.paymentMethod === 'online' ? newTransaction.onlineMobileNumber : undefined,
           accountNumber: newTransaction.accountNumber,
           receiptNumber: newTransaction.receiptNumber,
           remarks: newTransaction.remarks
@@ -833,6 +838,7 @@ export default function Transactions() {
         type: "deposit",
         amount: "",
         paymentMethod: "cash",
+        onlineMobileNumber: "",
         accountNumber: "",
         receiptNumber: "",
         remarks: "",
@@ -992,6 +998,8 @@ export default function Transactions() {
               return {
                 ...t,
                 ...withdrawalData,
+                id: t.id, // Explicitly keep the agent transaction ID
+                withdrawalId: withdrawalData.id, // Store the withdrawal collection ID
                 receiptNumber: t.receiptNumber || withdrawalData.receiptNumber || '', // Keep receipt from agent transaction
                 amount: withdrawalData.netAmount || t.amount,
                 requestedAmount: withdrawalData.requestedAmount || t.requestedAmount,
@@ -1078,6 +1086,7 @@ export default function Transactions() {
         amount: Number(editingTransaction.amount),
         date: editingTransaction.date,
         paymentMethod: editingTransaction.paymentMethod,
+        onlineMobileNumber: editingTransaction.paymentMethod === 'online' ? editingTransaction.onlineMobileNumber : undefined,
         receiptNumber: editingTransaction.receiptNumber,
         remarks: editingTransaction.remarks
       };
@@ -1138,7 +1147,8 @@ export default function Transactions() {
         await deleteTransaction(
           selectedAgent.phone,
           selectedCustomer.phone,
-          transaction.id
+          transaction.id,
+          transaction.withdrawalId
         );
 
         console.log("Transaction deleted successfully");
@@ -1800,7 +1810,7 @@ export default function Transactions() {
                                     <>
                                       <div className="fw-semibold">
                                         {transaction.withdrawalDate || transaction.date
-                                          ? new Date(transaction.withdrawalDate || transaction.date).toLocaleDateString()
+                                          ? new Date(transaction.withdrawalDate || transaction.date).toLocaleDateString('en-GB')
                                           : '-'}
                                       </div>
                                       {transaction.withdrawalTime || transaction.time ? (
@@ -1810,7 +1820,7 @@ export default function Transactions() {
                                   ) : (
                                     <>
                                       <div className="fw-semibold">
-                                        {transaction.date ? new Date(transaction.date).toLocaleDateString() : '-'}
+                                        {transaction.date ? new Date(transaction.date).toLocaleDateString('en-GB') : '-'}
                                       </div>
                                       {transaction.time && <small className="text-muted">{transaction.time}</small>}
                                     </>
@@ -1871,6 +1881,11 @@ export default function Transactions() {
                                     <ModeIcon size={14} />
                                     <span>{modeLabel}</span>
                                   </span>
+                                  {paymentMode === 'online' && transaction.onlineMobileNumber && (
+                                    <div>
+                                      <small className="text-muted d-block">📱 {transaction.onlineMobileNumber}</small>
+                                    </div>
+                                  )}
                                 </td>
                                 <td>
                                   <button
@@ -2122,6 +2137,38 @@ export default function Transactions() {
                       </select>
                     </div>
                   </div>
+
+                  {/* Online Mobile Number - Conditional Field */}
+                  {newTransaction.paymentMethod === 'online' && (
+                    <div className="row mb-4">
+                      <div className="col-12">
+                        <label className="form-label fw-semibold" style={{ color: '#667eea', fontSize: '0.95rem' }}>
+                          📱 Online Mobile Number <span className="text-danger">*</span>
+                        </label>
+                        <input
+                          type="tel"
+                          className="form-control form-control-lg"
+                          value={newTransaction.onlineMobileNumber}
+                          onChange={(e) => setNewTransaction({ ...newTransaction, onlineMobileNumber: e.target.value })}
+                          required={newTransaction.paymentMethod === 'online'}
+                          placeholder="Enter mobile number for online payment"
+                          pattern="[0-9]{10}"
+                          maxLength="10"
+                          style={{
+                            borderRadius: '12px',
+                            border: '2px solid #e0e0e0',
+                            padding: '12px 20px',
+                            fontSize: '1rem'
+                          }}
+                          onFocus={(e) => e.target.style.border = '2px solid #667eea'}
+                          onBlur={(e) => e.target.style.border = '2px solid #e0e0e0'}
+                        />
+                        <small className="text-muted d-block mt-2">
+                          <i className="bi bi-info-circle"></i> Enter 10-digit mobile number used for online payment
+                        </small>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Monthly Bonus Progress Display for Deposits */}
                   {newTransaction.type === 'deposit' && monthlyBonusSummary && (
@@ -2440,6 +2487,38 @@ export default function Transactions() {
                       </select>
                     </div>
                   </div>
+
+                  {/* Online Mobile Number - Conditional Field */}
+                  {editingTransaction.paymentMethod === 'online' && (
+                    <div className="row mb-4">
+                      <div className="col-12">
+                        <label className="form-label fw-semibold" style={{ color: '#f5576c', fontSize: '0.95rem' }}>
+                          📱 Online Mobile Number <span className="text-danger">*</span>
+                        </label>
+                        <input
+                          type="tel"
+                          className="form-control form-control-lg"
+                          value={editingTransaction.onlineMobileNumber || ''}
+                          onChange={(e) => setEditingTransaction({ ...editingTransaction, onlineMobileNumber: e.target.value })}
+                          required={editingTransaction.paymentMethod === 'online'}
+                          placeholder="Enter mobile number for online payment"
+                          pattern="[0-9]{10}"
+                          maxLength="10"
+                          style={{
+                            borderRadius: '12px',
+                            border: '2px solid #e0e0e0',
+                            padding: '12px 20px',
+                            fontSize: '1rem'
+                          }}
+                          onFocus={(e) => e.target.style.border = '2px solid #f5576c'}
+                          onBlur={(e) => e.target.style.border = '2px solid #e0e0e0'}
+                        />
+                        <small className="text-muted d-block mt-2">
+                          <i className="bi bi-info-circle"></i> Enter 10-digit mobile number used for online payment
+                        </small>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Date and Remarks */}
                   <div className="row mb-4">

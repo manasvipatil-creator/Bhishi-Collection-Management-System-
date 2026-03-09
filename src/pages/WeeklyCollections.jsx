@@ -289,7 +289,7 @@ export default function WeeklyCollections() {
           <div>
             <h4 className="mb-1 fw-bold text-dark">Weekly Collections</h4>
             <p className="mb-0 text-muted">
-              Track weekly payments and manage penalties · Week {selectedWeek} ({weekStartDate.toLocaleDateString()} - {weekEndDate.toLocaleDateString()})
+              Track weekly payments and manage penalties · Week {selectedWeek} ({weekStartDate.toLocaleDateString('en-GB')} - {weekEndDate.toLocaleDateString('en-GB')})
             </p>
           </div>
         </div>
