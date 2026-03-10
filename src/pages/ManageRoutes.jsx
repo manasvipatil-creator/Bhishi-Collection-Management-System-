@@ -3,6 +3,7 @@ import { ref, push, set, remove, onValue } from "firebase/database";
 import { db } from "../firebase";
 import { FiPlus, FiTrash2, FiEdit, FiSearch, FiX, FiMapPin } from "react-icons/fi";
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { syncRouteVillagesToAllAgents } from "../utils/databaseHelpers";
 
 export default function ManageRoutes() {
   const [routes, setRoutes] = useState([]);
@@ -68,6 +69,10 @@ export default function ManageRoutes() {
       });
 
       setNewRoute("");
+
+      // 🔄 Sync changes to all agents
+      await syncRouteVillagesToAllAgents();
+
       alert("Route added successfully!");
     } catch (error) {
       console.error("Error adding route:", error);
@@ -83,6 +88,10 @@ export default function ManageRoutes() {
     try {
       const routeRef = ref(db, `routes/${routeId}`);
       await remove(routeRef);
+
+      // 🔄 Sync changes to all agents
+      await syncRouteVillagesToAllAgents();
+
       alert("Route deleted successfully!");
     } catch (error) {
       console.error("Error deleting route:", error);
@@ -123,6 +132,9 @@ export default function ManageRoutes() {
       const routeRef = ref(db, `routes/${selectedRoute.id}/villages`);
       await set(routeRef, updatedVillages);
 
+      // 🔄 Automatically sync these changes to all existing agents
+      await syncRouteVillagesToAllAgents();
+
       // Update the selected route in state
       setSelectedRoute({
         ...selectedRoute,
@@ -146,6 +158,9 @@ export default function ManageRoutes() {
       const updatedVillages = existingVillages.filter(village => village !== villageToDelete);
       const routeRef = ref(db, `routes/${selectedRoute.id}/villages`);
       await set(routeRef, updatedVillages);
+
+      // 🔄 Automatically sync these changes to all existing agents
+      await syncRouteVillagesToAllAgents();
 
       // Update the selected route in state
       setSelectedRoute({

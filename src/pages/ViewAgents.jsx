@@ -59,16 +59,15 @@ export default function ViewAgents() {
 
           // Normalize routes to ensure they're always in the correct format
           let routes = value.agentInfo?.routes || (value.agentInfo?.route ? [value.agentInfo.route] : []);
-          // Ensure routes is always an array
           if (!Array.isArray(routes)) {
             routes = [];
           }
-          // Convert any route objects to strings (for backward compatibility)
+          // Preserve route objects (containing villages) instead of stripping them
           routes = routes.map(route => {
             if (typeof route === 'object' && route !== null) {
-              return route.name || 'Unknown Route';
+              return route;
             }
-            return route;
+            return { name: route, villages: [] };
           });
 
           return {
@@ -100,7 +99,10 @@ export default function ViewAgents() {
     const searchLower = searchTerm.toLowerCase();
     const nameMatch = agent.agentName?.toLowerCase().includes(searchLower);
     const phoneMatch = agent.mobileNumber?.includes(searchTerm);
-    const routeMatch = agent.routes?.some(route => route?.toLowerCase().includes(searchLower));
+    const routeMatch = agent.routes?.some(route => {
+      const routeName = typeof route === 'string' ? route : route?.name;
+      return routeName?.toLowerCase().includes(searchLower);
+    });
     return nameMatch || phoneMatch || routeMatch;
   }
   );
@@ -307,11 +309,13 @@ export default function ViewAgents() {
                           {agent.routes && agent.routes.length > 0 ? (
                             <div className="d-flex flex-wrap gap-1">
                               {agent.routes.map((route, idx) => {
-                                const villages = routesData[route] || [];
+                                const routeName = typeof route === 'string' ? route : route.name;
+                                // Use villages from agent's own data if available, or fallback to global routesData
+                                const villages = (typeof route === 'object' && route.villages) ? route.villages : (routesData[routeName] || []);
 
                                 return (
                                   <span key={idx} className="route-badge me-1" title={villages.length > 0 ? villages.join(', ') : ''}>
-                                    <FiMapPin className="me-1" /> {route}
+                                    <FiMapPin className="me-1" /> {routeName}
                                     {villages.length > 0 && (
                                       <small className="d-block" style={{ fontSize: '0.7rem', opacity: 0.9 }}>
                                         ({villages.length} villages)
@@ -403,11 +407,11 @@ export default function ViewAgents() {
                               return (
                                 <div key={idx} className="va-route-block">
                                   <div className="va-route-header">
-                                    <FiMapPin size={16} /> {route}
+                                    <FiMapPin size={16} /> {route.name || route}
                                   </div>
-                                  {villages.length > 0 && (
+                                  {(route.villages || routesData[route.name || route]) && (
                                     <div className="va-route-villages">
-                                      Villages: {villages.join(', ')}
+                                      Villages: {(route.villages || routesData[route.name || route] || []).join(', ')}
                                     </div>
                                   )}
                                 </div>

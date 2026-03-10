@@ -54,10 +54,11 @@ export default function AddAgent() {
       if (!Array.isArray(routes)) {
         routes = [];
       }
-      // Convert any route objects to strings (for backward compatibility)
+      // Convert any route objects to strings (for backward compatibility) IF they don't have villages
       routes = routes.map(route => {
         if (typeof route === 'object' && route !== null) {
-          return route.name || 'Unknown Route';
+          // Keep the whole object if it has a name
+          return route.name ? route : (route.name || 'Unknown Route');
         }
         return route;
       });

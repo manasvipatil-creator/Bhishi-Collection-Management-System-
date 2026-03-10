@@ -614,7 +614,10 @@ export const searchAgents = (agents, searchTerm) => {
   return agents.filter(agent =>
     agent.name?.toLowerCase().includes(term) ||
     agent.phone?.includes(term) ||
-    agent.routes?.some(route => route.toLowerCase().includes(term))
+    agent.routes?.some(route => {
+      const routeName = typeof route === 'string' ? route : route?.name;
+      return routeName?.toLowerCase().includes(term);
+    })
   );
 };
 
@@ -1350,6 +1353,50 @@ export const getAllEligibleCustomers = async (filterYear = null) => {
     return [];
   }
 };
+/**
+ * Sync all villages from global /routes to all agents' routes array
+ * This ensures that when a village is added to a route, all agents automatically see it.
+ */
+export const syncRouteVillagesToAllAgents = async () => {
+  try {
+    // 1. Get all routes from global /routes
+    const routesRef = ref(db, 'routes');
+    const routesSnapshot = await get(routesRef);
+    if (!routesSnapshot.exists()) return;
+
+    const allRoutesData = routesSnapshot.val();
+
+    // 2. Sort routes and prepare the standardized routes array
+    const standardizedRoutes = Object.values(allRoutesData)
+      .filter(r => r.status === 'active')
+      .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+      .map(r => ({
+        name: r.name,
+        villages: r.villages || []
+      }));
+
+    // 3. Get all agents
+    const agentsRef = ref(db, 'agents');
+    const agentsSnapshot = await get(agentsRef);
+    if (!agentsSnapshot.exists()) return;
+
+    const agentsData = agentsSnapshot.val();
+    const updatePromises = [];
+
+    // 4. Update each agent's routes array
+    Object.keys(agentsData).forEach(agentPhone => {
+      const agentRoutesRef = ref(db, `agents/${agentPhone}/agentInfo/routes`);
+      updatePromises.push(set(agentRoutesRef, standardizedRoutes));
+    });
+
+    await Promise.all(updatePromises);
+    console.log("Successfully synced routes to all agents");
+    return true;
+  } catch (error) {
+    console.error("Error syncing routes to agents:", error);
+    return false;
+  }
+};
 
 const databaseHelpers = {
   getAllAgents,
@@ -1375,7 +1422,9 @@ const databaseHelpers = {
   checkThirteenthMonthPayment,
   calculateWithdrawalPenalty,
   processEarlyWithdrawal,
-  getAllEligibleCustomers
+  getAllEligibleCustomers,
+  syncRouteVillagesToAllAgents
 };
 
 export default databaseHelpers;
+

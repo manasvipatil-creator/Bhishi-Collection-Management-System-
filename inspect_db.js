@@ -16,24 +16,12 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 async function inspect() {
-  try {
-    const agentsRef = ref(db, 'agents');
-    const snapshot = await get(agentsRef);
-    if (snapshot.exists()) {
-      const agents = snapshot.val();
-      for (const [phone, agent] of Object.entries(agents)) {
-        if (agent.agentInfo && agent.agentInfo.routes) {
-          console.log(`Agent: ${phone} (${agent.agentInfo.agentName})`);
-          console.log('Routes:', JSON.stringify(agent.agentInfo.routes, null, 2));
-          console.log('---');
-        }
-      }
-    }
-    process.exit(0);
-  } catch (error) {
-    console.error(error);
-    process.exit(1);
-  }
-}
+  const snap = await get(ref(db, 'routes/-OnGwtcbk55J21oOvlVP'));
+  console.log('Route node:', JSON.stringify(snap.val(), null, 2));
 
+  const snap2 = await get(ref(db, 'agents/7249438550/agentInfo/routes'));
+  console.log('\nAgent routes:', JSON.stringify(snap2.val(), null, 2));
+
+  process.exit(0);
+}
 inspect();
