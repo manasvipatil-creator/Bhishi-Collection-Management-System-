@@ -173,13 +173,17 @@ export default function ManageRoutes() {
         .mr-list-item { padding:14px 16px; border-bottom:1px solid #f1f3f5 }
         .mr-list-item:last-child { border-bottom:0 }
         .mr-small { color:#6c757d; font-size:0.9rem }
-        .mr-modal-overlay { position:absolute; inset:0; background:rgba(255,255,255,0.8); display:flex; align-items:center; justify-content:center; z-index:10; border-radius:8px; backdrop-filter: blur(1px); }
-        .mr-modal { width:95%; max-width:480px; background:#fff; border-radius:12px; overflow:hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.1); border: 1px solid rgba(0,0,0,0.05); }
+        .mr-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index:9999; backdrop-filter: blur(4px); }
+        .mr-modal { width:95%; max-width:480px; max-height: 90vh; background:#fff; border-radius:12px; overflow:hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.2); border: 1px solid rgba(0,0,0,0.05); display: flex; flex-direction: column; }
         .mr-modal-header { padding: 16px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .mr-modal-body { padding: 20px; }
+        .mr-modal-body { padding: 20px; display: flex; flex-direction: column; overflow: hidden; }
         .mr-add-btn { background: linear-gradient(90deg, #8b5cf6, #a78bfa); border: none; font-weight: 600; color: white; padding: 0 24px; }
         .mr-add-btn:hover { background: linear-gradient(90deg, #7c3aed, #8b5cf6); color: white; }
-        .mr-village-list { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; margin-top: 16px; }
+        .mr-village-list { border: 1px solid #e5e7eb; border-radius: 8px; margin-top: 16px; background: #f9fafb; overflow-y: auto; max-height: 400px; }
+        .mr-village-list::-webkit-scrollbar { width: 6px; }
+        .mr-village-list::-webkit-scrollbar-track { background: #f1f3f5; }
+        .mr-village-list::-webkit-scrollbar-thumb { background: #dee2e6; border-radius: 10px; }
+        .mr-village-list::-webkit-scrollbar-thumb:hover { background: #adb5bd; }
         .mr-village-item { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: #fff; }
         .mr-village-item:last-child { border-bottom: none; }
         .mr-actions .btn { min-width:46px }
@@ -293,56 +297,56 @@ export default function ManageRoutes() {
                 </div>
               )}
             </div>
-            {/* Village Management Modal (Exact Design Match) */}
-            {showVillageModal && selectedRoute && (
-              <div className="mr-modal-overlay" onClick={() => setShowVillageModal(false)}>
-                <div className="mr-modal" onClick={(e) => e.stopPropagation()}>
-                  <div className="mr-modal-header">
-                    <h5 className="mb-0 fw-bold text-dark d-flex align-items-center">
-                      <FiMapPin className="me-2 text-primary" style={{ strokeWidth: 2.5 }} />
-                      {selectedRoute.name}
-                    </h5>
-                    <button type="button" className="btn-close" onClick={() => setShowVillageModal(false)} aria-label="Close" style={{ opacity: 0.5 }}></button>
-                  </div>
-                  <div className="mr-modal-body">
-                    <div className="input-group mb-0">
-                      <input
-                        type="text"
-                        className="form-control form-control-lg border-end-0"
-                        placeholder="Add village..."
-                        style={{ fontSize: '1rem', padding: '10px 16px', borderColor: '#dee2e6' }}
-                        value={newVillage}
-                        onChange={(e) => setNewVillage(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleAddVillage()}
-                      />
-                      <button className="btn mr-add-btn" onClick={handleAddVillage} disabled={!newVillage.trim()} type="button">
-                        <FiPlus className="me-1" strokeWidth={3} /> ADD
-                      </button>
-                    </div>
-
-                    <div className="mr-village-list">
-                      {selectedRoute.villages?.length > 0 ? (
-                        selectedRoute.villages.map((village, index) => (
-                          <div key={index} className="mr-village-item">
-                            <span className="text-dark fw-medium">{village}</span>
-                            <button className="btn btn-link text-danger p-0 border-0" onClick={() => handleDeleteVillage(village)} type="button">
-                              <FiTrash2 size={18} />
-                            </button>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="mr-village-item justify-content-center text-muted">
-                          No villages added yet
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
+      {/* Village Management Modal (Fixed Position at end) */}
+      {showVillageModal && selectedRoute && (
+        <div className="mr-modal-overlay" onClick={() => setShowVillageModal(false)}>
+          <div className="mr-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mr-modal-header">
+              <h5 className="mb-0 fw-bold text-dark d-flex align-items-center">
+                <FiMapPin className="me-2 text-primary" style={{ strokeWidth: 2.5 }} />
+                {selectedRoute.name}
+              </h5>
+              <button type="button" className="btn-close" onClick={() => setShowVillageModal(false)} aria-label="Close" style={{ opacity: 0.5 }}></button>
+            </div>
+            <div className="mr-modal-body">
+              <div className="input-group mb-0">
+                <input
+                  type="text"
+                  className="form-control form-control-lg border-end-0"
+                  placeholder="Add village..."
+                  style={{ fontSize: '1rem', padding: '10px 16px', borderColor: '#dee2e6' }}
+                  value={newVillage}
+                  onChange={(e) => setNewVillage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddVillage()}
+                />
+                <button className="btn mr-add-btn" onClick={handleAddVillage} disabled={!newVillage.trim()} type="button">
+                  <FiPlus className="me-1" strokeWidth={3} /> ADD
+                </button>
+              </div>
+
+              <div className="mr-village-list">
+                {selectedRoute.villages?.length > 0 ? (
+                  selectedRoute.villages.map((village, index) => (
+                    <div key={index} className="mr-village-item">
+                      <span className="text-dark fw-medium">{village}</span>
+                      <button className="btn btn-link text-danger p-0 border-0" onClick={() => handleDeleteVillage(village)} type="button">
+                        <FiTrash2 size={18} />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="mr-village-item justify-content-center text-muted">
+                    No villages added yet
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
