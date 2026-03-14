@@ -210,7 +210,7 @@ export default function TestWhatsApp() {
             <div className="card-body">
               <h6>Webhook URL:</h6>
               <code className="d-block mb-3 p-2 bg-light rounded">
-                https://webhook.whatapi.in/webhook/69213b981b9845c02d533ccb
+                https://webhook.whatapi.in/webhook/69aa76e002e28c7ee4e36141
               </code>
 
               <h6>Parameters sent:</h6>
