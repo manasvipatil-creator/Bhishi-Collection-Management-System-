@@ -11,6 +11,7 @@ export default function AddCustomer() {
     const [loadingAgents, setLoadingAgents] = useState(true);
     const [message, setMessage] = useState("");
     const [selectedAgentRoutes, setSelectedAgentRoutes] = useState([]);
+    const [allRoutes, setAllRoutes] = useState([]); // Added state for all routes
     const [selectedRouteName, setSelectedRouteName] = useState("");
     const [availableVillages, setAvailableVillages] = useState([]);
 
@@ -24,15 +25,18 @@ export default function AddCustomer() {
         active: true
     });
 
+    const [assignToAll, setAssignToAll] = useState(false);
     const [errors, setErrors] = useState({});
 
     useEffect(() => {
-        const fetchAgents = async () => {
+        const fetchData = async () => {
+            setLoadingAgents(true);
             try {
+                // Fetch agents
                 const agentsRef = ref(db, "agents");
-                const snapshot = await get(agentsRef);
-                if (snapshot.exists()) {
-                    const data = snapshot.val();
+                const agentsSnapshot = await get(agentsRef);
+                if (agentsSnapshot.exists()) {
+                    const data = agentsSnapshot.val();
                     const agentsList = Object.entries(data).map(([mobile, agent]) => ({
                         mobile,
                         name: agent.agentInfo?.agentName || "Unknown",
@@ -41,13 +45,25 @@ export default function AddCustomer() {
                     }));
                     setAgents(agentsList);
                 }
+
+                // Fetch all routes
+                const routesRef = ref(db, "routes");
+                const routesSnapshot = await get(routesRef);
+                if (routesSnapshot.exists()) {
+                    const data = routesSnapshot.val();
+                    const routesList = Object.entries(data).map(([id, route]) => ({
+                        id,
+                        ...route
+                    }));
+                    setAllRoutes(routesList);
+                }
             } catch (error) {
-                console.error("Error fetching agents:", error);
+                console.error("Error fetching data:", error);
             } finally {
                 setLoadingAgents(false);
             }
         };
-        fetchAgents();
+        fetchData();
     }, []);
 
     const handleAgentChange = (e) => {
@@ -102,7 +118,8 @@ export default function AddCustomer() {
         if (!customer.phoneNumber.trim()) newErrors.phoneNumber = "Phone number is required";
         else if (!/^\d{10}$/.test(customer.phoneNumber)) newErrors.phoneNumber = "Phone number must be 10 digits";
 
-        if (!customer.agentId) newErrors.agentId = "Please select an agent";
+        if (!customer.accountNumber.trim()) newErrors.accountNumber = "Account number is required";
+        if (!assignToAll && !customer.agentId) newErrors.agentId = "Please select an agent";
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -146,19 +163,28 @@ export default function AddCustomer() {
                 village: customerData.village || "N/A"
             };
 
-            // Use phoneNumber as the unique key under customers
-            const customerRef = ref(db, `agents/${agentId}/customers/${customerData.phoneNumber}`);
+            if (assignToAll) {
+                // Add to all agents
+                const promises = agents.map(async (agent) => {
+                    const customerRef = ref(db, `agents/${agent.mobile}/customers/${customerData.phoneNumber}`);
+                    return set(customerRef, fullCustomerData);
+                });
+                await Promise.all(promises);
+            } else {
+                // Use phoneNumber as the unique key under customers
+                const customerRef = ref(db, `agents/${agentId}/customers/${customerData.phoneNumber}`);
 
-            // Check if customer already exists
-            const snapshot = await get(customerRef);
-            if (snapshot.exists()) {
-                if (!window.confirm("A customer with this phone number already exists under this agent. Overwrite?")) {
-                    setLoading(false);
-                    return;
+                // Check if customer already exists
+                const snapshot = await get(customerRef);
+                if (snapshot.exists()) {
+                    if (!window.confirm("A customer with this phone number already exists under this agent. Overwrite?")) {
+                        setLoading(false);
+                        return;
+                    }
                 }
-            }
 
-            await set(customerRef, fullCustomerData);
+                await set(customerRef, fullCustomerData);
+            }
 
             setMessage("Customer added successfully!");
             setTimeout(() => {
@@ -212,15 +238,43 @@ export default function AddCustomer() {
                                 <div className="row g-4">
                                     {/* Agent Selection */}
                                     <div className="col-md-6">
-                                        <label className="form-label">Select Agent</label>
+                                        <div className="d-flex justify-content-between align-items-center mb-1">
+                                            <label className="form-label mb-0">Select Agent</label>
+                                            <div className="form-check form-switch mb-0">
+                                                <input
+                                                    className="form-check-input"
+                                                    type="checkbox"
+                                                    id="assignToAll"
+                                                    checked={assignToAll}
+                                                    onChange={(e) => {
+                                                        const checked = e.target.checked;
+                                                        setAssignToAll(checked);
+                                                        if (checked) {
+                                                            setCustomer(prev => ({ ...prev, agentId: "" }));
+                                                            setSelectedAgentRoutes(allRoutes);
+                                                            setSelectedRouteName("");
+                                                            setAvailableVillages([]);
+                                                        } else {
+                                                            setSelectedAgentRoutes([]);
+                                                            setSelectedRouteName("");
+                                                            setAvailableVillages([]);
+                                                        }
+                                                    }}
+                                                    style={{ cursor: 'pointer' }}
+                                                />
+                                                <label className="form-check-label fw-bold small ms-2" htmlFor="assignToAll" style={{ cursor: 'pointer', color: '#0d6efd' }}>
+                                                    Assign to All Agents
+                                                </label>
+                                            </div>
+                                        </div>
                                         <select
                                             className={`form-select ${errors.agentId ? 'is-invalid' : ''}`}
                                             name="agentId"
                                             value={customer.agentId}
                                             onChange={handleAgentChange}
-                                            disabled={loadingAgents}
+                                            disabled={loadingAgents || assignToAll}
                                         >
-                                            <option value="">-- Select Agent --</option>
+                                            <option value="">{assignToAll ? "-- All Agents Selected --" : "-- Select Agent --"}</option>
                                             {agents.map((agent) => (
                                                 <option key={agent.mobile} value={agent.mobile}>
                                                     {agent.name} ({agent.mobile})
@@ -237,7 +291,7 @@ export default function AddCustomer() {
                                             className="form-select"
                                             value={selectedRouteName}
                                             onChange={handleRouteChange}
-                                            disabled={!customer.agentId || selectedAgentRoutes.length === 0}
+                                            disabled={(!customer.agentId && !assignToAll) || selectedAgentRoutes.length === 0}
                                         >
                                             <option value="">{selectedAgentRoutes.length === 0 ? "-- No routes assigned --" : "-- Select Route --"}</option>
                                             {selectedAgentRoutes.map((route, idx) => {
@@ -300,15 +354,16 @@ export default function AddCustomer() {
 
                                     {/* Account Number */}
                                     <div className="col-md-6">
-                                        <label className="form-label">Account Number (Optional)</label>
+                                        <label className="form-label">Account Number</label>
                                         <input
                                             type="text"
-                                            className="form-control"
+                                            className={`form-control ${errors.accountNumber ? 'is-invalid' : ''}`}
                                             placeholder="Bank account or unique identifier"
                                             name="accountNumber"
                                             value={customer.accountNumber}
                                             onChange={handleChange}
                                         />
+                                        {errors.accountNumber && <div className="invalid-feedback">{errors.accountNumber}</div>}
                                     </div>
 
 

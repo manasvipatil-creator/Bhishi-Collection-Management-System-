@@ -3,8 +3,8 @@
  * Sends transaction notifications via WhatsApp webhook API
  */
 
-const WITHDRAWAL_WEBHOOK_URL = 'https://webhook.whatapi.in/webhook/69213b981b9845c02d533ccb';
-const DEPOSIT_WEBHOOK_URL = 'https://webhook.whatapi.in/webhook/69213b981b9845c02d533ccb';
+const WITHDRAWAL_WEBHOOK_URL = 'https://webhook.whatapi.in/webhook/69aa76e002e28c7ee4e36141';
+const DEPOSIT_WEBHOOK_URL = 'https://webhook.whatapi.in/webhook/69aa76e002e28c7ee4e36141';
 
 /**
  * Helper: Format Indian phone number
@@ -22,20 +22,20 @@ const sendWhatsAppMessage = async (phone, messageParams, webhookBaseUrl) => {
     console.log('=== Starting WhatsApp Message Send ===');
     console.log('Phone:', phone);
     console.log('Message Params:', messageParams);
-    
+
     // Validate phone number
     if (!phone || phone.length < 10) {
       throw new Error(`Invalid phone number: ${phone}`);
     }
-    
+
     const webhookUrl = new URL(webhookBaseUrl);
     webhookUrl.searchParams.append('number', phone);
-    
+
     // Join parameters with commas into a single 'message' parameter
     // This matches the exact format used in the working old version
     const messageString = messageParams.join(',');
     webhookUrl.searchParams.append('message', messageString);
-    
+
     console.log('Final Webhook URL:', webhookUrl.toString());
 
     // Add timeout to the fetch request
@@ -44,9 +44,9 @@ const sendWhatsAppMessage = async (phone, messageParams, webhookBaseUrl) => {
 
     console.log('Sending request to webhook...');
     const startTime = Date.now();
-    
+
     // mode: 'no-cors' avoids CORS preflight
-    await fetch(webhookUrl.toString(), { 
+    await fetch(webhookUrl.toString(), {
       method: 'GET',
       mode: 'no-cors',
       signal: controller.signal
@@ -54,22 +54,22 @@ const sendWhatsAppMessage = async (phone, messageParams, webhookBaseUrl) => {
 
     const responseTime = Date.now() - startTime;
     console.log(`✅ Webhook fired in ${responseTime}ms (no-cors — response is opaque but message is sent)`);
-    
+
     return {
       success: true,
       status: 200,
       message: 'Webhook triggered successfully'
     };
-    
+
   } catch (error) {
     const errorMsg = `WhatsApp Send Error: ${error.message}`;
-    console.error(errorMsg, { 
+    console.error(errorMsg, {
       error: error.toString(),
       stack: error.stack,
       phone,
       messageParams
     });
-    
+
     // Return error information instead of throwing
     return {
       success: false,
@@ -102,7 +102,7 @@ export const sendDepositNotification = async (data) => {
       console.error(errorMsg);
       throw new Error(errorMsg);
     }
-    
+
     if (amount === undefined || amount === null) {
       const errorMsg = 'Amount is required';
       console.error(errorMsg);
@@ -113,37 +113,36 @@ export const sendDepositNotification = async (data) => {
     const phone = formatPhoneNumber(customerPhone);
     const formattedAmount = Number(amount).toFixed(2);
     const formattedTotal = Number(totalAmount || amount).toFixed(2);
-    
-    // Create message parameters array for the deposit webhook
-    // Format: bhishi,var1,var2,var3,var4,var5,var6  (7 params — must match whatapi.in template)
+
+    // Create message parameters array (6 items: Template Name + 5 Variables)
+    // Mapping matches the "deposited" template: name, amount, accountNo, total, agent
     const messageParams = [
-      'bhishi',
-      customerName || 'Customer',
-      formattedAmount,
-      formattedAmount,           // repeated as deposit amount
-      accountNumber || 'N/A',
-      formattedTotal,
-      agentName || 'Agent'
+      'deposited',
+      customerName || 'Customer', // var1
+      formattedAmount,           // var2
+      accountNumber || 'N/A',     // var3
+      formattedTotal,            // var4
+      agentName || 'Agent'       // var5
     ];
 
-    console.log('Sending deposit notification with parameters:');
+    console.log('Sending deposit notification (6 items):');
     console.log(messageParams);
 
     const result = await sendWhatsAppMessage(phone, messageParams, DEPOSIT_WEBHOOK_URL);
-    console.log('Notification sent successfully:', result);
+    console.log('Notification result:', result);
 
-    return { 
-      success: true, 
-      message: 'Deposit notification sent',
-      data: result 
+    return {
+      success: result.success,
+      message: result.success ? 'Deposit notification sent' : `Failed: ${result.error}`,
+      data: result
     };
   } catch (error) {
     const errorMsg = `Deposit Notification Error: ${error.message}`;
     console.error(errorMsg, error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       message: errorMsg,
-      error: error 
+      error: error
     };
   }
 };
@@ -181,14 +180,14 @@ export const sendWithdrawalNotification = async (data) => {
     }
 
     // Format values
-    const phone            = formatPhoneNumber(customerPhone);
-    const penaltyAmt       = Number(penaltyAmount || 0);
-    const requestAmt       = Number(amount        || 0);
+    const phone = formatPhoneNumber(customerPhone);
+    const penaltyAmt = Number(penaltyAmount || 0);
+    const requestAmt = Number(amount || 0);
     const formattedRequest = requestAmt.toFixed(2);
-    const formattedFinal   = Number(netAmount ?? amount).toFixed(2);
-    const formattedBalance = Number(totalAmount   || 0).toFixed(2);
-    const acctNo           = accountNumber || 'N/A';
-    const agent            = agentName    || 'Agent';
+    const formattedFinal = Number(netAmount ?? amount).toFixed(2);
+    const formattedBalance = Number(totalAmount || 0).toFixed(2);
+    const acctNo = accountNumber || 'N/A';
+    const agent = agentName || 'Agent';
 
     // Format penalty: descriptive when applied, "0.00" when no penalty
     const formattedPenalty = penaltyAmt > 0
@@ -200,35 +199,36 @@ export const sendWithdrawalNotification = async (data) => {
       formattedFinal, acctNo, formattedBalance, agent
     });
 
-    // Webhook template — must use 'bhishi' format exactly like old working code
+    // Create message parameters array (8 items: Template Name + 7 Variables)
+    // Mapping: withdrawal, {name}, {requested}, {penalty}, {final}, {acctNo}, {balance}, {agent}
     const messageParams = [
-      'bhishi',
-      customerName || 'Customer',
-      formattedRequest,
-      formattedRequest, // repeated as per old format
-      acctNo,
-      formattedBalance,
-      agent
+      'withdrawal',
+      customerName || 'Customer', // var1
+      formattedRequest,           // var2
+      formattedPenalty,           // var3
+      formattedFinal,             // var4
+      acctNo,                      // var5
+      formattedBalance,           // var6
+      agent                       // var7
     ];
 
-    console.log('Sending withdrawal notification with parameters:');
+    console.log('Sending withdrawal notification (8 items):');
     console.log(messageParams);
 
     const result = await sendWhatsAppMessage(phone, messageParams, WITHDRAWAL_WEBHOOK_URL);
-    console.log('Withdrawal notification sent successfully:', result);
-
-    return { 
-      success: true, 
-      message: 'Withdrawal notification sent',
-      data: result 
+    
+    return {
+      success: result.success,
+      message: result.success ? 'Withdrawal notification sent' : `Failed: ${result.error}`,
+      data: result
     };
   } catch (error) {
     const errorMsg = `Withdrawal Notification Error: ${error.message}`;
     console.error(errorMsg, error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       message: errorMsg,
-      error: error 
+      error: error
     };
   }
 };
@@ -256,7 +256,7 @@ export const sendCreditNotification = async (data) => {
       console.error(errorMsg);
       throw new Error(errorMsg);
     }
-    
+
     if (amount === undefined || amount === null) {
       const errorMsg = 'Amount is required';
       console.error(errorMsg);
@@ -267,36 +267,34 @@ export const sendCreditNotification = async (data) => {
     const phone = formatPhoneNumber(customerPhone);
     const formattedAmount = Number(amount).toFixed(2);
     const formattedTotal = Number(totalAmount || amount).toFixed(2);
-    
-    // Create message parameters array for the webhook
+
+    // Create message parameters array (6 items: Template Name + 5 Variables)
     const messageParams = [
-      'bhishi',
-      customerName || 'Customer',
-      formattedAmount,
-      'credit',
-      accountNumber || 'N/A',
-      formattedTotal,
-      agentName || 'Agent'
+      'deposited',
+      customerName || 'Customer', // var1
+      formattedAmount,           // var2
+      accountNumber || 'N/A',     // var3
+      formattedTotal,            // var4
+      agentName || 'Agent'       // var5
     ];
 
-    console.log('Sending credit notification with parameters:');
+    console.log('Sending credit notification (6 items):');
     console.log(messageParams);
 
     const result = await sendWhatsAppMessage(phone, messageParams, DEPOSIT_WEBHOOK_URL);
-    console.log('Credit notification sent successfully:', result);
-
-    return { 
-      success: true, 
-      message: 'Credit notification sent',
-      data: result 
+    
+    return {
+      success: result.success,
+      message: result.success ? 'Credit notification sent' : `Failed: ${result.error}`,
+      data: result
     };
   } catch (error) {
     const errorMsg = `Credit Notification Error: ${error.message}`;
     console.error(errorMsg, error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       message: errorMsg,
-      error: error 
+      error: error
     };
   }
 };
@@ -318,20 +316,23 @@ export const testWebhook = async (phone = '919876543210', name = 'Test User', am
   try {
     console.log('=== Testing Webhook ===');
     const webhookUrl = type === 'withdrawal' ? WITHDRAWAL_WEBHOOK_URL : DEPOSIT_WEBHOOK_URL;
-    const testParams = type === 'withdrawal'
-      ? ['withdrawal', name, amount.toString(), accountNo, total.toString(), agent, '', '']
-      : ['deposited', name, amount.toString(), accountNo, total.toString(), agent];
-    console.log('Test Parameters:', testParams);
     
+    // Use the specific template identifiers required by the active webhook
+    const testParams = type === 'withdrawal'
+      ? ['withdrawal', name, amount.toFixed(2), '0.00', amount.toFixed(2), accountNo, total.toFixed(2), agent]
+      : ['deposited', name, amount.toFixed(2), accountNo, total.toFixed(2), agent];
+    
+    console.log('Test Parameters:', testParams);
+
     const result = await sendWhatsAppMessage(phone, testParams, webhookUrl);
     console.log('Test Result:', result);
-    
+
     if (result.success) {
       console.log('✅ Webhook test successful!');
     } else {
       console.error('❌ Webhook test failed:', result.error || 'Unknown error');
     }
-    
+
     return result;
   } catch (error) {
     console.error('❌ Test Error:', error);

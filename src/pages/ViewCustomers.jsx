@@ -94,25 +94,43 @@ export default function ViewCustomers() {
 
   // Filter agents based on search input
   const handleSearch = (e) => {
-    const value = e.target.value.toLowerCase();
-    setSearchTerm(value);
+    const rawValue = e.target.value;
+    const value = rawValue.toLowerCase().trim();
+    setSearchTerm(rawValue); // preserve raw value for display
 
     if (!value) {
       setFilteredAgents(agents);
+      setExpandedAgents([]); // Collapse all when search is cleared
       return;
     }
 
-    const filtered = agents.filter(
-      (agent) =>
-        agent.agentName.toLowerCase().includes(value) ||
-        agent.agentId.toLowerCase().includes(value) ||
-        agent.customers.some(customer =>
-          customer.name.toLowerCase().includes(value) ||
-          customer.phoneNumber.includes(value) ||
-          customer.village.toLowerCase().includes(value)
-        )
-    );
+    const filtered = agents.reduce((acc, agent) => {
+      // Check if agent itself matches
+      const agentMatches = agent.agentName.toLowerCase().includes(value) || 
+                           agent.agentId.toLowerCase().includes(value) ||
+                           agent.agentMobile.includes(value);
+
+      // Check which customers match
+      const matchingCustomers = agent.customers.filter(customer =>
+          (customer.name && customer.name.toLowerCase().includes(value)) ||
+          (customer.phoneNumber && customer.phoneNumber.includes(value)) ||
+          (customer.village && customer.village.toLowerCase().includes(value)) ||
+          (customer.accountNumber && customer.accountNumber.toString().toLowerCase().includes(value))
+      );
+
+      // If agent matches, we can optionally show all customers, or still filter them.
+      if (agentMatches) {
+        acc.push({ ...agent }); 
+      } else if (matchingCustomers.length > 0) {
+        acc.push({ ...agent, customers: matchingCustomers });
+      }
+      return acc;
+    }, []);
+
     setFilteredAgents(filtered);
+
+    // Auto-expand all matching agents so customers are directly visible
+    setExpandedAgents(filtered.map(a => a.agentMobile));
   };
 
   // Delete customer and update UI immediately
